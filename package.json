@@ -1,0 +1,35 @@
+{
+  "name": "react-native-detect-caller-id",
+  "version": "1.8.0",
+  "description": "Module for detecting caller id by provided callers list",
+  "main": "index.js",
+  "files": [
+    "README.md",
+    "android",
+    "index.js",
+    "ios",
+    "react-native-detect-caller-id.podspec"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://git.prototype.berlin/prototype-berlin/react-native-detect-caller-id.git"
+  },
+  "keywords": [
+    "react-native"
+  ],
+  "author": "prototype.berlin GmbH",
+  "license": "MIT",
+  "licenseFilename": "LICENSE",
+  "readmeFilename": "README.md",
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-native": ">=0.60.0-rc.0 <1.0.x"
+  },
+  "devDependencies": {
+    "react": "^18.0.0",
+    "react-native": "^0.70.0"
+  }
+}

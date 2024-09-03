@@ -1,93 +1,276 @@
-# React Native Detect Caller Id
+<p align="center">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImage.png" alt="Cover" title="React Native Detect CallerID" width="800">
+</p>
 
+React Native Detect CallerID implements [Broadcast Receiver](https://developer.android.com/guide/components/broadcasts) (Android) and [CallKit: Call Directory Extension](https://developer.apple.com/documentation/callkit/cxcalldirectoryextensioncontext) (iOS).
 
+With this library you can simple add CallerID for your React-Native Apps. For iOS library provides additional information on calling screen. For android library render additional layout with your information about incoming phone number.
 
-## Getting started
+<hr/>
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+<br/>
+<p align="center">
+    <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridiOSImage.PNG" alt="React Native Detect CallerID iOS" title="React Native Detect CallerID" height="600" >
+    <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridAndroidClosedImage.jpg" alt="React Native Detect CallerID Android 1" title="React Native Detect CallerID" height="600">
+    <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridAndroidOpenedImage.jpg" alt="React Native Detect CallerID Android 2" title="React Native Detect CallerID" height="600">
+</p>
+<br/>
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Table of Contents
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://git.prototype.berlin/prototype-berlin/react-native-detect-caller-id.git
-git branch -M master
-git push -uf origin master
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://git.prototype.berlin/prototype-berlin/react-native-detect-caller-id/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- [Installation](#installation)
+- [Basic Usage](#basic-usage)
+- [API](#api)
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+Using Yarn
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```sh
+yarn add react-native-detect-caller-id
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Using npm
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```sh
+npm install react-native-detect-caller-id --save
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### iOS
+Firsty, you should add `Call Directory Extension`.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+<p align="center">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImageTutorial1.png" alt="Cover" title="React Native Detect CallerID" width="200">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImageTutorial2.png" alt="Cover" title="React Native Detect CallerID" width="600">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImageTutorial3.png" alt="Cover" title="React Native Detect CallerID" width="800">
+</p>
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+It creates new folder in your main app. Open `CallDirectoryHandler.swift` and delete all content. Then add content from `node_modules/react-native-detect-caller-id/ios/CallDirectoryExtension/CallDirectoryHandler.swift`. Its replace default handler implementation to library implementation.
 
-## License
-For open source projects, say how it is licensed.
+<p align="center">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImageTutorial4.png" alt="Cover" title="React Native Detect CallerID" height="300">
+</p>
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Secondly, you should use provisioning profile for your app with enabled AppGroup Capability, so add this Capability.
+
+<p align="center">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImageTutorial5.png" alt="Cover" title="React Native Detect CallerID" width="800">
+</p>
+
+Thirdly, select your CallDirectoryExtension target and set provisioning profile for extension and add similar AppGroup (see previous point).
+
+<p align="center">
+  <img src="https://yesskyscrapers.github.io/app4t2site/reactnativedetectcalleridImageTutorial6.png" alt="Cover" title="React Native Detect CallerID" width="800">
+</p>
+
+Lastly, IMPORTANT! check your `CallDirectoryHandler.swift`. It should define similar DATA_GROUP constant with your AppGroup.
+
+### Android
+
+Any actions not required.
+
+For customization caller information layout you can add `caller_info_dialog.xml` inside `YOUR_APP/android/app/src/main/res/layout/` folder. For example, you can copy layout implementation from `node_modules/react-native-detect-caller-id/android/src/main/res/layout/caller_info_dialog.xml`.
+
+Button with id `close_btn` will get click action to closing layout.
+LinearLayout with id `callerLabel` will get click action to closing layout.
+TextView with id `appName` will get text with your AppName.
+TextView with id `callerName` will get text with CallerName provided with library for incoming number.
+ImageView with id `appIcon` will get drawable with your app default icon.
+
+
+## Basic Usage
+
+```javascript
+import CallerDetector from 'react-native-detect-caller-id';
+
+// Check required permissions for your platform
+checkPermissions = async () => {
+    if (Platform.OS == 'android') {
+        const checkInfo = await CallerDetector.checkPermissions()
+        console.log('checkPermissions', checkInfo)
+    } else {
+        const checkInfo = await CallerDetector.getExtensionEnabledStatus()
+        console.log('getExtensionEnabledStatus', checkInfo)
+    }
+}
+
+// Open android overlay settings screen
+onAskOverlayPermission = async () => {
+    const permission = await CallerDetector.requestOverlayPermission()
+    console.log('onAskOverlayPermission', permission)
+}
+
+// Ask required permissions for android 
+onAskPermissions = async () => {
+    const permission = await CallerDetector.requestPhonePermission()
+    console.log('onAskPermissions', permission)
+}
+
+// Settings default detecting app
+onAskServicePermissions = async () => {
+    const permission = await CallerDetector.requestServicePermission()
+    console.log('onAskServicePermissions', permission)
+}
+
+// Set params for your ios Extension, AppGroup and android encryption
+onSetParams = async () => {
+    CallerDetector.setParams({
+        ios: {
+            EXTENSION_ID: 'packagename.CallDirectoryExtension',
+            DATA_GROUP: 'group.packagename',
+            DATA_KEY: 'callerListKey'
+        },
+        android: {
+            dbPassword: "dbpassword",
+            fieldsPassword: "16-length-pass!!" // using 128bit mask for encryption so u need to use 16-length password
+        }
+    })
+}
+
+// Migrate unencryption db from prev version to new android encryption DB
+onMigrateData = async () => {
+    CallerDetector.migrateOldDataBaseToEncrypted()
+}
+
+
+// Open iOS settings for settings Detect Caller App
+onOpenSettings = async () => {
+    const permission = await CallerDetector.openExtensionSettings()
+    console.log('onOpenSettings', permission)
+}
+
+// Setting Callers for detecting
+setCallerList = async () => {
+    let callers = []
+    callers.push({
+        name: `Pavel Nikolaev`,
+        appointment: `Developer`,
+        city: `Riga`,
+        iosRow: `Pavel Nikolaev, Developer, Riga`,
+        number: 79771678179,
+        isDeleted: false
+    })
+
+    callers.push({
+        name: `Pavel Nikolaev`,
+        appointment: `Developer`,
+        city: `Riga`,
+        iosRow: `Pavel Nikolaev, Developer, Riga`,
+        number: 79013308179,
+        isDeleted: true
+    })
+
+    let result = await CallerDetector.setCallerList(callers)
+    console.log(result);
+}
+
+```
+
+## API
+* `checkPermissions`: Promise<any> - (*ONLY Android*) returns all permissions for android
+* `requestOverlayPermission`: Promise<string> - (*ONLY Android*) returns result of overlay request
+* `requestPhonePermission`: Promise<string> - (*ONLY Android*) returns result of permissions request
+* `requestServicePermission`: Promise<string> - (*ONLY Android*) returns result of service request
+* `getExtensionEnabledStatus`: Promise<string> - (*ONLY iOS*) returns extension status
+* `setParams`: Void - return nothing. Just set params for your ios extension, appgroup and android encryption
+* `migrateOldDataBaseToEncrypted`: Promive<Void> - return nothing. Just migrate old unencryption db from prev version to new android encryption DB
+* `openExtensionSettings`: Promise<any> - (*ONLY iOS*) return nothing. Just opening extension settings page (iOS 13.4+)
+* `setCallerList`: Promise<any> - return nothing. Waiting end of process.
+
+
+## Check Permissions (Android)
+Checking all android permissions for correctly working. Service permissions required with Android 10. For lower version its return always true
+```js
+const checkInfo = await CallerDetector.checkPermissions()
+console.log('checkPermissions', checkInfo)
+//checkPermissions {"overlayPermissionGranted": true, "phonePermissionGranted": true, "servicePermissionGranted": true}
+```
+
+## Request Overlay Permission (Android)
+Asking user to allow overlay permission. You should ask this, if checkPermissions method returned "overlayPermissionGranted": false
+```js
+const permission = await CallerDetector.requestOverlayPermission()
+console.log('requestOverlayPermission', permission)
+//requestOverlayPermission granted/denied
+```
+
+## Request Phone Permissions (Android)
+Asking user to allow phone permissions. You should ask this, if checkPermissions method returned "phonePermissionGranted": false.
+Library using READ_PHONE_STATE and READ_CALL_LOG permissions.
+```js
+const permission = await CallerDetector.requestPhonePermission()
+console.log('requestPhonePermission', permission)
+//requestPhonePermission ["granted/denied", "granted/denied"]
+```
+
+## Request Service Permission (Android)
+Asking user to set default call detect app. You should ask this, if checkPermissions method returned "servicePermissionGranted": false.
+Default call detect app starts with Android 10, so this method will always return "granted" for lower OS versions.
+```js
+const permission = await CallerDetector.requestServicePermission()
+console.log('requestServicePermission', permission)
+//requestServicePermission granted/denied
+```
+
+## Set Params
+Before use methods you should to set your ios extension, appgroup and android encryption params by this method. IOS params should be similar with CallDirectoryHandler.swift.
+```js
+CallerDetector.setParams({
+    
+     ios: {
+        EXTENSION_ID: 'packagename.CallDirectoryExtension', // Similar with your Extension name
+        DATA_GROUP: 'group.packagename', // Similar with your AppGroup
+        DATA_KEY: 'callerListKey' // Similar with DATA_KEY from your CallDirectoryHandler.swift file
+    },
+    android: {
+        dbPassword: "password", // any length password for all db encryption
+        fieldsPassword: "16-length-pass!!" // 16-length password for encryption fields in db. Using 128 bit mask, so we nned to use 16 length password
+    }
+})
+```
+
+## Migrate Old DB to New Encrypted version
+If u used previous version of module, u have unsafe db on android. So use this method for save data between DBs.
+```js
+CallerDetector.migrateOldDataBaseToEncrypted()
+```
+
+## Check Extension Status (iOS)
+Checking one required permission for working library on iOS. User required to set active for call detect extension. Method returns its status.
+```js
+const status = await CallerDetector.getExtensionEnabledStatus()
+console.log('getExtensionEnabledStatus', status)
+//getExtensionEnabledStatus granted/denied
+```
+
+## Open Extension Settings (iOS)
+Library provides opening settings method to set active call detect extension. Available for iOS 13.4+
+```js
+CallerDetector.openExtensionSettings()
+```
+
+## Set Caller List
+Setting callerlist for detecting. For 10k nubmers its takes average 1 min for ios.
+```js
+    let callers = []
+    callers.push({
+        name: `Pavel Nikolaev`,
+        appointment: `Developer`,
+        city: `Riga`,
+        iosRow: `Pavel Nikolaev, Developer, Riga`,
+        number: 79771678179,
+        isDeleted: false
+    })
+
+    callers.push({
+        name: `Pavel Nikolaev`,
+        appointment: `Developer`,
+        city: `Riga`,
+        iosRow: `Pavel Nikolaev, Developer, Riga`,
+        number: 79013308179,
+        isDeleted: true
+    })
+
+    let result = await CallerDetector.setCallerList(callers)
+    console.log(result);
+```
