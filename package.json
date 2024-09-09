@@ -17,6 +17,7 @@
     "type": "git",
     "url": "git+https://git.prototype.berlin/prototype-berlin/react-native-detect-caller-id.git"
   },
+  "homepage": "https://git.prototype.berlin/prototype-berlin/react-native-detect-caller-id",
   "keywords": [
     "react-native"
   ],
