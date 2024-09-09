@@ -2,29 +2,25 @@
 
 @interface RCT_EXTERN_MODULE(DetectCallerId, NSObject)
 
-RCT_EXTERN_METHOD(setCallerList: (NSArray*) callerList
-                  withExtensionId: (NSString *)EXTENSION_ID
-                  withDataGroup: (NSString *)DATA_GROUP
-                  withDataKey: (NSString *)DATA_KEY
+RCT_EXTERN_METHOD(setCallerList: (NSString *) options
                   withResolver:(RCTPromiseResolveBlock)resolve
                   withRejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(getExtensionEnabledStatus:
-                  (NSString *)EXTENSION_ID
-                  withResolver: (RCTPromiseResolveBlock)resolve
+RCT_EXTERN_METHOD(clearCallerList: (RCTPromiseResolveBlock)resolve
+                  withRejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(checkPermissions: (RCTPromiseResolveBlock)resolve
                   withRejecter: (RCTPromiseRejectBlock)reject
 )
 
-RCT_EXTERN_METHOD(getWasDbDrobbed:
-                  (RCTPromiseResolveBlock)resolve
-                  withRejecter:(RCTPromiseRejectBlock)reject
-)
-
-RCT_EXTERN_METHOD(openExtensionSettings: (RCTPromiseResolveBlock)resolve
+RCT_EXTERN_METHOD(requestPermissions: (RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 
 
-RCT_EXTERN_METHOD(clearCallerList: (NSString *) EXTENSION_ID
+RCT_EXTERN_METHOD(reloadExtension: (RCTPromiseResolveBlock)resolve
+                 withRejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(simulateIncomingCall: (NSInteger) phoneNumber
                   withResolver:(RCTPromiseResolveBlock)resolve
                   withRejecter:(RCTPromiseRejectBlock)reject)
 

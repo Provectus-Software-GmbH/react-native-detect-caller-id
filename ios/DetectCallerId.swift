@@ -1,81 +1,56 @@
 import CallKit
 
 
+
 @objc(DetectCallerId)
 class DetectCallerId: NSObject {
-
-    func saveData(transferData: CallerTransferData){
-        do {
-            let sharedDefaults = UserDefaults(suiteName: DATA_GROUP);
-
-            let encoded = try JSONEncoder().encode(transferData);
-            let jsonString = String(data: encoded,
-                                    encoding: .utf8)
-
-            sharedDefaults?.set(jsonString, forKey: DATA_KEY);
-        }catch {
-            print(error.localizedDescription)
-        }
-    }
-
-    func loadData() -> CallerTransferData {
-        let transferData = (UserDefaults(suiteName: DATA_GROUP)?.string(forKey: DATA_KEY) ?? nil)
-
-        if (transferData != nil ){
-            let jsonData = transferData!.data(using: .utf8)!
-            let data: CallerTransferData = try! JSONDecoder().decode(CallerTransferData.self, from: jsonData)
-
-            return data
-        } else {
-            let data = CallerTransferData(data: [], action: ActionType.parseCallers.rawValue, wasDbDropped: false)
-
-            return data;
-        }
-    }
+    let groupKey = "group.de.provectus.SecureContacts22";
+    let dataKey = "callerId";
+    let identifier = "de.provectus.SecureContacts22.CallDirectoryExtension";
 
     @objc
     func setCallerList(
-        _ callerList: Array<Any>,
-        withExtensionId EXTENSION_ID: String,
-        withDataGroup DATA_GROUP: String,
-        withDataKey DATA_KEY: String,
+        _ options: String,
         withResolver resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject:  @escaping RCTPromiseRejectBlock
     ) -> Void {
+          if let userDefaults = UserDefaults(suiteName: groupKey) {
+            userDefaults.set(options, forKey: dataKey)
 
-        do {
-
-            let transferData = CallerTransferData(data: callerList as! [String], action: ActionType.parseCallers.rawValue, wasDbDropped: false)
-
-            saveData(transferData: transferData)
-
-            CXCallDirectoryManager.sharedInstance.reloadExtension(withIdentifier: EXTENSION_ID, completionHandler: {error -> Void in
-
-
-                if ((error) != nil){
-                    reject("CALLER_ID", error!.localizedDescription, error);
-                } else {
-                    resolve("true");
-                }
-
-            })
-        } catch {
-            reject("CALLER_ID", error.localizedDescription, error);
+            // our CallDirectoryHandler will parse json stringified callerList
+            reloadExtension(resolve, withRejecter: reject);
         }
+    }
+
+    @objc
+    func clearCallerList(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject:  @escaping RCTPromiseRejectBlock) -> Void {
+            let options = """
+            {
+                "type": "clearAll",
+                "items": []
+            }
+            """
+
+            NSLog("DetectCallerId: clearCallerList")
+
+            if let userDefaults = UserDefaults(suiteName: groupKey) {
+              userDefaults.set(options, forKey: dataKey)
+
+              // our CallDirectoryHandler will parse json stringified callerList
+              reloadExtension(resolve, withRejecter: reject);
+            }
     }
 
 
     @objc
-    func getExtensionEnabledStatus(
-        _ EXTENSION_ID: String,
-        withResolver resolve: @escaping RCTPromiseResolveBlock,
-        withRejecter reject: @escaping RCTPromiseRejectBlock
-    ) -> Void {
-
-        print("[native] getExtensionEnabledStatus");
-        CXCallDirectoryManager.sharedInstance.getEnabledStatusForExtension(withIdentifier: EXTENSION_ID, completionHandler: { enabledStatus, error -> Void in
+    func checkPermissions(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+        CXCallDirectoryManager.sharedInstance.getEnabledStatusForExtension(withIdentifier: identifier, completionHandler: { enabledStatus, error -> Void in
             if (enabledStatus.rawValue == 0){
-                reject("CALLER_ID", "getExtensionEnabledStatus error - Failed to get extension status: " + (error?.localizedDescription ?? ""), error);
+                reject("DetectCallerId", "getExtensionEnabledStatus error - Failed to get extension status: " + (error?.localizedDescription ?? ""), error);
             } else if (enabledStatus.rawValue == 1){
                 resolve("denied");
             }else if (enabledStatus.rawValue == 2){
@@ -85,59 +60,128 @@ class DetectCallerId: NSObject {
     }
 
     @objc
-    func openExtensionSettings(_ resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+    func requestPermissions(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
 
         if #available(iOS 13.4, *) {
             CXCallDirectoryManager.sharedInstance.openSettings(completionHandler: { error -> Void in
 
                 if ((error) != nil){
-                    reject("CALLER_ID", "openExtensionSettings error - failed to open settings" + error!.localizedDescription, error);
+                    reject("DetectCallerId", "openExtensionSettings error - failed to open settings" + error!.localizedDescription, error);
                 } else {
                     resolve("");
                 }
             })
         } else {
-            reject("CALLER_ID", "openExtensionSettings error - openExtensionSettings allowed since iOS 13.4", "openExtensionSettings error - openExtensionSettings allowed since iOS 13.4" as! Error);
+            reject("DetectCallerId", "openExtensionSettings error - openExtensionSettings allowed since iOS 13.4", "openExtensionSettings error - openExtensionSettings allowed since iOS 13.4" as! Error);
         }
     }
 
     @objc
-    func getWasDbDrobbed(_ resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
-
-        let transferDataPrev = loadData()
-
-        let transferDataNew = CallerTransferData(data: transferDataPrev.data, action: transferDataPrev.action, wasDbDropped: false)
-
-        saveData(transferData: transferDataNew)
-
-        resolve(transferDataPrev.wasDbDropped)
-    }
-
-    @objc
-    func clearCallerList(_ EXTENSION_ID: String,
-          withResolver resolve: @escaping RCTPromiseResolveBlock,
-          withRejecter reject:  @escaping RCTPromiseRejectBlock) -> Void {
-
+    func reloadExtension(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
         do {
-
-            let transferData = CallerTransferData(data: [], action: ActionType.dropAllDb.rawValue, wasDbDropped: false)
-
-            saveData(transferData: transferData)
-
-
-            CXCallDirectoryManager.sharedInstance.reloadExtension(withIdentifier: EXTENSION_ID, completionHandler: {error -> Void in
-
+            CXCallDirectoryManager.sharedInstance.reloadExtension(withIdentifier: identifier, completionHandler: {error -> Void in
+                self.clearStore();
 
                 if ((error) != nil){
-                    reject("CALLER_ID", error!.localizedDescription, error);
+                    self.reloadFailed(withError: error!, withRejecter: reject);
                 } else {
-                    resolve("true");
+                    resolve("CXCallDirectoryManager reloaded");
                 }
 
             })
 
         } catch {
-            reject("CALLER_ID", error.localizedDescription, error);
+            clearStore();
+
+            reject("DetectCallerId", error.localizedDescription, error);
         }
+    }
+
+    @objc
+    func simulateIncomingCall(
+    _ phoneNumber: Int64,
+    withResolver resolve: @escaping RCTPromiseResolveBlock,
+    withRejecter reject:  @escaping RCTPromiseRejectBlock) -> Void {
+
+        NSLog("Simulate incoming call: \(phoneNumber)")
+
+        let uuid = UUID()
+        let update = CXCallUpdate()
+        update.remoteHandle = CXHandle(type: .phoneNumber, value: "\(phoneNumber)")
+        update.hasVideo = false
+        let pconfig = CXProviderConfiguration(localizedName: "SecureContacts Call")
+        let provider = CXProvider(configuration: pconfig)
+
+        provider.reportNewIncomingCall(with: uuid, update: update) { error in
+            if let error = error as NSError? {
+
+                var errorMessage: String
+
+                switch error.code {
+                case CXErrorCodeIncomingCallError.callUUIDAlreadyExists.rawValue:
+                    // Handle duplicate call ID
+                    errorMessage = "Handle duplicate call ID"
+                case CXErrorCodeIncomingCallError.filteredByBlockList.rawValue:
+                    // Handle call from blocked user
+                    errorMessage = "Handle call from blocked user"
+                case CXErrorCodeIncomingCallError.filteredByDoNotDisturb.rawValue:
+                    errorMessage = "Handle call while in do-not-disturb mode"
+                default:
+                    // Handle unknown error
+                    errorMessage = "Handle unknown error"
+                }
+
+                reject("simulateIncomingCall", errorMessage, error);
+            } else {
+              resolve("simulateIncomingCall succeeded");
+            }
+        }
+    }
+
+    private func clearStore() -> Void {
+      if let userDefaults = UserDefaults(suiteName: groupKey) {
+          userDefaults.removeObject(forKey: dataKey)
+          NSLog("clean up temp store")
+      }
+    }
+
+    private func reloadFailed(
+        withError error: Error,
+        withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+        NSLog("CallDirectoryHandler Error: " + error.localizedDescription)
+
+        let nsError = error as NSError
+        var errorMessage: String
+
+        switch nsError.code {
+        case 0:
+            errorMessage = "Extension could not be loaded for an unknown reason."
+        case 1:
+            errorMessage = "Could not load extension. Extension not found."
+        case 2:
+            errorMessage = "Could not load extension. Extension was interrupted while loading."
+        case 3:
+            errorMessage = "Could not load extension. Call entries are out of order."
+        case 4:
+            errorMessage = "Could not load extension. Duplicate entries."
+        case 5:
+            errorMessage = "Could not load extension. Maximum entries exceeded."
+        case 6:
+            errorMessage = "Extension not enabled in Settings."
+        case 7:
+            errorMessage = "Could not load extension. The extension is currently loading."
+        case 8:
+            errorMessage = "Unexpected incremental removal."
+        default:
+            errorMessage = "Extension could not be loaded for an unknown reason."
+        }
+
+        NSLog("Error: \(errorMessage)")
+
+        reject("DetectCallerId", errorMessage, error);
     }
 }
