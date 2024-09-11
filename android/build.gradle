@@ -5,7 +5,8 @@ buildscript {
     }
 
     dependencies {
-      classpath 'com.android.tools.build:gradle:8.1.0' // Updated to the latest version
+      classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+      classpath 'com.android.tools.build:gradle:8.1.0'
     }
 }
 
@@ -22,6 +23,7 @@ def isNewArchitectureEnabled() {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 if (isNewArchitectureEnabled()) {
     apply plugin: "com.facebook.react"
@@ -30,7 +32,7 @@ if (isNewArchitectureEnabled()) {
 android {
     def agpVersion = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION
     if (agpVersion.tokenize('.')[0].toInteger() >= 7) {
-        namespace "ru.nasvyazi.callerid"
+        namespace "berlin.prototype.callerid"
         buildFeatures {
             buildConfig true
         }
@@ -74,33 +76,15 @@ def reactNativeArchitectures() {
     ]
 }
 
-
 repositories {
     mavenCentral()
-    google()
-}
-
-ext {
-  supportLibraryVersion = '27.1.1'
-  roomVersion = '1.1.0'
-  lifeCycle = '1.1.1'
 }
 
 dependencies {
-    implementation 'com.android.support.constraint:constraint-layout:1.1.3'
-    implementation 'com.google.code.gson:gson:2.8.5'
-    implementation "net.zetetic:android-database-sqlcipher:4.5.0"
-    implementation "androidx.sqlite:sqlite:2.0.1"
-    implementation "com.android.support:appcompat-v7:$supportLibraryVersion"
-    implementation "com.android.support:design:$supportLibraryVersion"
-    implementation "com.android.support:support-v4:$supportLibraryVersion"
-
-    implementation "android.arch.persistence.room:runtime:$roomVersion"
-    annotationProcessor "android.arch.persistence.room:compiler:$roomVersion"
-
-    implementation "android.arch.lifecycle:extensions:$lifeCycle"
-    annotationProcessor "android.arch.lifecycle:compiler:$lifeCycle"
-
     implementation 'com.facebook.react:react-native:+'
+    implementation 'com.google.code.gson:gson:2.11.0'
 
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation "androidx.core:core-ktx:1.6.0"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
 }
