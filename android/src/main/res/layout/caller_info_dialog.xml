@@ -12,7 +12,7 @@
     android:layout_height="wrap_content"
     android:layout_marginStart="15dp"
     android:layout_marginEnd="15dp"
-    android:background="@drawable/blue_rounded"
+    android:background="@color/colorPrimary"
     android:clickable="true"
     android:orientation="vertical">
 
@@ -28,7 +28,7 @@
         android:contentDescription="App icon"
         android:drawableStart="@drawable/ic_close_white"
         android:padding="10dp"
-        app:srcCompat="@android:mipmap/sym_def_app_icon" 
+        app:srcCompat="@android:mipmap/sym_def_app_icon"
       />
 
 
@@ -39,7 +39,6 @@
         android:layout_marginStart="10dp"
         android:layout_weight="1"
         android:gravity="center_vertical"
-        android:text="@string/default_app_name"
         android:textColor="@android:color/white"
         android:textSize="18sp" />
 
@@ -61,41 +60,25 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:gravity="center"
-        android:paddingLeft="10dp"
-        android:paddingTop="10dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="10dp"
+        android:paddingLeft="8dp"
+        android:paddingTop="8dp"
+        android:paddingRight="8dp"
+        android:paddingBottom="8dp"
         android:text="@string/default_caller_name"
         android:textColor="@android:color/white"
-        android:textSize="24sp" />
-
+        android:textSize="16sp" />
     <TextView
-        android:id="@+id/callerAppointment"
+        android:id="@+id/callerInfo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:gravity="center"
-        android:paddingLeft="10dp"
-        android:paddingTop="10dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="10dp"
-        android:text="@string/default_caller_appointment"
+        android:paddingLeft="8dp"
+        android:paddingTop="4dp"
+        android:paddingRight="8dp"
+        android:paddingBottom="16dp"
         android:textColor="@android:color/white"
-        android:textSize="24sp" />
-
-    <TextView
-        android:id="@+id/callerCity"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:paddingLeft="10dp"
-        android:paddingTop="10dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="10dp"
-        android:text="@string/default_caller_city"
-        android:textColor="@android:color/white"
-        android:textSize="24sp" />
+        android:textSize="14sp" />
   </LinearLayout>
 
 

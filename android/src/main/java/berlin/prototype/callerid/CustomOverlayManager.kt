@@ -9,7 +9,9 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
+import android.telecom.Call
 import android.telephony.TelephonyManager
 import android.util.Log
 import android.view.LayoutInflater
@@ -19,14 +21,11 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import berlin.prototype.callerid.db.User
+import androidx.annotation.RequiresApi
+import berlin.prototype.callerid.db.CallerManager
 
-
-interface GetCallerHandler {
-    fun onGetCaller(user: User?)
-}
-
-class CallReceiver : BroadcastReceiver() {
+@RequiresApi(Build.VERSION_CODES.N)
+class CustomOverlayManager : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!Settings.canDrawOverlays(context)) {
             return
@@ -34,33 +33,24 @@ class CallReceiver : BroadcastReceiver() {
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
         if (state == TelephonyManager.EXTRA_STATE_RINGING) {
             if (!isShowingOverlay) {
-                var phoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
-                if (phoneNumber == null) {
-                    phoneNumber = callServiceNumber
-                }
 
-                if (phoneNumber == null) {
-                    return
-                }
-                isShowingOverlay = true
+              val phoneNumber = callServiceNumber ?: return
+              val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
+              
+              isShowingOverlay = true
 
-                getCallerName(context, phoneNumber, object : GetCallerHandler {
-                    override fun onGetCaller(user: User?) {
-                        if (user != null) {
-                            val callerName: String = user.fullName
-                            val callerAppointment: String = user.appointment
-                            val callerCity: String = user.city
-
-                            showCallerInfo(context, callerName, callerAppointment, callerCity)
-                        }
-                    }
-                })
+              val parts = caller.label.split(",", limit = 2)
+              val callerName = parts[0].trim()
+              val callerInfo = if (parts.size > 1) parts[1].trim() else ""
+              showCallerInfo(context, callerName, callerInfo)
             }
         } else if (state == TelephonyManager.EXTRA_STATE_OFFHOOK || state == TelephonyManager.EXTRA_STATE_IDLE) {
+            Log.d("CustomOverlayManager", "hide overlay")
             if (isShowingOverlay) {
                 isShowingOverlay = false
                 callServiceNumber = null
                 dismissCallerInfo(context)
+
             }
         }
     }
@@ -82,45 +72,52 @@ class CallReceiver : BroadcastReceiver() {
     private fun showCallerInfo(
         context: Context,
         callerName: String,
-        callerAppointment: String,
-        callerCity: String
+        callerInfo: String,
     ) {
-        var appName = ""
-        appName = getApplicationName(context)
-        val finalAppName = appName
+        var appName = getApplicationName(context)
         val layout = this.getLayoutTemplate(context)
 
-        Handler().postDelayed({
-            val windowManager: WindowManager =
-                context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            if (overlay == null) {
-                val inflater: LayoutInflater = LayoutInflater.from(context)
-                overlay = inflater.inflate(layout, null) as LinearLayout
+        Handler(Looper.getMainLooper()).postDelayed({
+          val windowManager: WindowManager =
+            context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+          if (overlay == null) {
+            val inflater: LayoutInflater = LayoutInflater.from(context)
+            overlay = inflater.inflate(layout, null) as LinearLayout
 
+            fillLayout(context, appName, callerName, callerInfo)
+          }
 
+          val typeParam: Int = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
-                fillLayout(context, finalAppName, callerName, callerAppointment, callerCity)
-            }
-            val typeParam: Int =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
+          val params: WindowManager.LayoutParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            typeParam,
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+          )
 
-            val params: WindowManager.LayoutParams = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                typeParam,
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT
-            )
-            windowManager.addView(overlay, params)
+          // TODO: replace deprecated FLAG_SHOW_WHEN_LOCKED with keyguardManager
+          // this would require starting an activity which we currently haven't implemented
+          // something like this:
+          // val overlayIntent = Intent(context, OverlayActivity::class.java)
+          // overlayIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          // context?.startActivity(overlayIntent)
+          //
+          // OverlayActivity: Activity() {
+          //  val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+          //  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+          //    keyguardManager.requestDismissKeyguard(this, null)
+          //  }
+          windowManager.addView(overlay, params)
         }, 1000)
     }
 
     private fun fillLayout(
         context: Context,
-        finalAppName: String,
+        appName: String,
         callerName: String,
-        callerAppointment: String?,
-        callerCity: String?
+        callerInfo: String
     ) {
         try {
             val closeButton: Button = overlay!!.findViewById(R.id.close_btn)
@@ -143,7 +140,7 @@ class CallReceiver : BroadcastReceiver() {
         try {
             // Set app name
             val textViewAppName: TextView = overlay!!.findViewById<TextView>(R.id.appName)
-            textViewAppName.text = finalAppName
+            textViewAppName.text = appName
         } catch (error: Exception) {
         }
 
@@ -155,24 +152,13 @@ class CallReceiver : BroadcastReceiver() {
         }
 
         try {
-            // Set caller appointment
-            val textViewCallerAppointment: TextView =
-                overlay!!.findViewById<TextView>(R.id.callerAppointment)
-            if (callerAppointment != null && callerAppointment.length > 0) {
-                textViewCallerAppointment.text = callerAppointment
+            // Set caller info/label
+            val textViewCallerInfo: TextView =
+                overlay!!.findViewById<TextView>(R.id.callerInfo)
+            if (callerInfo != null && callerInfo.length > 0) {
+              textViewCallerInfo.text = callerInfo
             } else {
-                textViewCallerAppointment.visibility = View.GONE
-            }
-        } catch (error: Exception) {
-        }
-
-        try {
-            // Set caller name
-            val textViewCallerCity: TextView = overlay!!.findViewById<TextView>(R.id.callerCity)
-            if (callerCity != null && callerCity.length > 0) {
-                textViewCallerCity.text = callerCity
-            } else {
-                textViewCallerCity.visibility = View.GONE
+              textViewCallerInfo.text = ""
             }
         } catch (error: Exception) {
         }
@@ -199,36 +185,6 @@ class CallReceiver : BroadcastReceiver() {
                 windowManager.removeView(overlay)
                 overlay = null
             }
-        }
-    }
-
-    private fun getCallerName(
-        context: Context,
-        phoneNumberInString: String,
-        getCallerNameHandler: GetCallerHandler
-    ) {
-        try {
-            var correctedPhoneNumber = phoneNumberInString
-            if (correctedPhoneNumber != null && correctedPhoneNumber[0] == '+') {
-                correctedPhoneNumber = correctedPhoneNumber.substring(1)
-            }
-
-            val phoneForSearch = correctedPhoneNumber
-
-          Log.d("CallReceiver", "get caller info for $phoneForSearch");
-
-          val dummyUser = User()
-
-          dummyUser.id = "dummyId"
-          dummyUser.number = phoneForSearch
-          dummyUser.fullName = "Max Mustermann"
-          dummyUser.appointment = "Developer"
-          dummyUser.city = "Berlin"
-
-          getCallerNameHandler.onGetCaller(dummyUser);
-        } catch (err: Exception) {
-            Log.i("CALLER_ID", err.localizedMessage)
-            getCallerNameHandler.onGetCaller(null)
         }
     }
 

@@ -4,22 +4,29 @@
 
     <uses-permission android:name="android.permission.READ_CALL_LOG"></uses-permission>
     <uses-permission android:name="android.permission.READ_PHONE_STATE"></uses-permission>
+    <uses-permission android:name="android.permission.CALL_SCREENING" />
+
+    <!--
+      for phones using a custom dialer app which does not implement
+      contacts content provider interface
+    -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"></uses-permission>
 
     <application>
+        <!--
+          for phones using a custom dialer app which does not implement
+          contacts content provider interface
+        -->
         <receiver
-            android:name=".CallReceiver"
+            android:name=".CustomOverlayManager"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.PHONE_STATE" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
-            </intent-filter>
         </receiver>
 
-
+        <!-- block or allow incoming calls -->
         <service
           android:name=".CallDetectScreeningService"
           android:exported="true"
@@ -30,8 +37,8 @@
         </service>
 
         <!-- Required to register the CustomConnectionService for CallSimulator -->
-        <service android:name="berlin.prototype.callerid.CustomConnectionService"
-                 android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE" android:exported="true">
+        <service android:name=".CustomConnectionService"
+          android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE" android:exported="true">
           <intent-filter>
             <action android:name="android.telecom.ConnectionService" />
           </intent-filter>
