@@ -80,27 +80,11 @@ CallerDetector.requestServicePermission = async () => {
 };
 
 CallerDetector.setCallerList = async (options) => {
-    if (Platform.OS == 'android') {
-        console.info('TODO: implement setCallerList for android');
-
-        return null;
-    }
-
-    return await CallerId.setCallerList(JSON.stringify(options));
+    return CallerId.setCallerList(JSON.stringify(options));
 };
 
 CallerDetector.clearCallerList = async () => {
-    try {
-        if (Platform.OS == 'android') {
-            console.info('TODO: implement clearCallerList for android');
-
-            return null;
-        }
-
-        return CallerId.clearCallerList();
-    } catch (error) {
-        throw error;
-    }
+  return CallerId.clearCallerList();
 };
 
 
@@ -113,10 +97,11 @@ CallerDetector.reloadExtension = async () => {
     }
 };
 
-// ios only! for debugging
 CallerDetector.simulateIncomingCall = async (phonenumber) => {
     try {
-        return CallerId.simulateIncomingCall(phonenumber);
+      return CallerId.simulateIncomingCall(Platform.OS === 'android' ?
+        phonenumber.toString():
+        phonenumber);
     } catch (error) {
         throw error;
     }
