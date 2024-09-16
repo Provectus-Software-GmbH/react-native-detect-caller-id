@@ -1,6 +1,8 @@
 package berlin.prototype.callerid
 
+import android.content.Context
 import android.os.Build
+import android.telecom.TelecomManager
 import android.util.Log
 import androidx.annotation.RequiresApi
 import berlin.prototype.callerid.db.CallerManager
@@ -15,6 +17,7 @@ import org.json.JSONObject
 @RequiresApi(Build.VERSION_CODES.Q)
 class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   private val context = reactContext
+  private var contentProviderAvailable = false
 
   // Declare CallManager with the current context
   private val callManager = CallManager(context)
@@ -25,7 +28,8 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     override fun initialize() {
       super.initialize()
-      CallerManager.initialize(context)
+      contentProviderAvailable = hasGenuineAndroidDefaultDialer()
+      CallerManager.initialize(context, contentProviderAvailable)
     }
 
     @ReactMethod
@@ -80,5 +84,22 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     @ReactMethod
     fun requestServicePermission(promise: Promise) {
       this.permissionsHelper.requestServicePermission(promise)
+    }
+
+    private fun getDefaultDialer(): String {
+      return try {
+        val manager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager?
+        manager?.defaultDialerPackage ?: ""
+      } catch (ex: Exception) {
+        ex.printStackTrace()
+        ""
+      }
+    }
+
+    private fun hasGenuineAndroidDefaultDialer(): Boolean {
+      val curDefaultDialer = getDefaultDialer()
+
+      return curDefaultDialer == "com.google.android.dialer" ||
+        curDefaultDialer == "com.android.dialer"
     }
 }

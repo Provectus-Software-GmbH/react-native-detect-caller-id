@@ -89,7 +89,7 @@ class DetectCallerId: NSObject {
                 if ((error) != nil){
                     self.reloadFailed(withError: error!, withRejecter: reject);
                 } else {
-                    resolve("CXCallDirectoryManager reloaded");
+                    resolve("CXCallDirectoryManager process finished");
                 }
 
             })
@@ -177,10 +177,10 @@ class DetectCallerId: NSObject {
         case 8:
             errorMessage = "Unexpected incremental removal."
         default:
-            errorMessage = "Extension could not be loaded for an unknown reason."
+            errorMessage = error.localizedDescription
         }
 
-        NSLog("Error: \(errorMessage)")
+        NSLog("Error: \(errorMessage) \(nsError)")
 
         reject("DetectCallerId", errorMessage, error);
     }

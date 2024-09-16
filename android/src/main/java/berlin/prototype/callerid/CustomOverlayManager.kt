@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.telecom.Call
 import android.telephony.TelephonyManager
 import android.util.Log
 import android.view.LayoutInflater
@@ -27,7 +26,7 @@ import berlin.prototype.callerid.db.CallerManager
 @RequiresApi(Build.VERSION_CODES.N)
 class CustomOverlayManager : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (!Settings.canDrawOverlays(context)) {
+        if (!Settings.canDrawOverlays(context) || CallerManager.contentProviderAvailable) {
             return
         }
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
@@ -36,7 +35,7 @@ class CustomOverlayManager : BroadcastReceiver() {
 
               val phoneNumber = callServiceNumber ?: return
               val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
-              
+
               isShowingOverlay = true
 
               val parts = caller.label.split(",", limit = 2)
@@ -57,7 +56,7 @@ class CustomOverlayManager : BroadcastReceiver() {
 
     private fun getLayoutTemplate(context: Context): Int {
         val manager: PackageManager = context.packageManager
-        var resources: Resources? = null
+        var resources: Resources?
         var layout: Int
         try {
             resources = manager.getResourcesForApplication(context.packageName)
@@ -116,8 +115,8 @@ class CustomOverlayManager : BroadcastReceiver() {
     private fun fillLayout(
         context: Context,
         appName: String,
-        callerName: String,
-        callerInfo: String
+        callerName: String?,
+        callerInfo: String?
     ) {
         try {
             val closeButton: Button = overlay!!.findViewById(R.id.close_btn)

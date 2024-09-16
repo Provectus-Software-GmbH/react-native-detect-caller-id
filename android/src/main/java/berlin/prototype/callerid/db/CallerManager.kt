@@ -14,6 +14,8 @@ import java.io.OutputStreamWriter
 
 @RequiresApi(Build.VERSION_CODES.N)
 object CallerManager {
+  var contentProviderAvailable = false
+
   private val blockedCallers = mutableListOf<Caller>()
   private val allowedCallers = mutableListOf<Caller>()
 
@@ -22,8 +24,9 @@ object CallerManager {
 
   private var appContext: ReactApplicationContext? = null
 
-  fun initialize(context: ReactApplicationContext) {
+  fun initialize(context: ReactApplicationContext, contentProvider: Boolean) {
     appContext = context
+    contentProviderAvailable = contentProvider
     allowedCallers.addAll(getSavedCallerList(ALLOWED_CALLERS_FILE))
     blockedCallers.addAll(getSavedCallerList(BLOCKED_CALLERS_FILE))
 
@@ -85,9 +88,10 @@ object CallerManager {
     clearCallerList(blockedCallers, BLOCKED_CALLERS_FILE)
   }
 
-  fun getAllowedCallers(): MutableList<Caller> = allowedCallers
-
-  fun getBlockedCallers(): MutableList<Caller> = blockedCallers
+  // remove "+" and white space from phone number
+  fun getNormalizedPhoneNumber(phoneNumber: String?): String {
+    return phoneNumber?.replace(Regex("[+\\s]"), "") ?: ""
+  }
 
   fun getCallerByNumber(phoneNumber: String): Caller? {
     return allowedCallers.find { it.phoneNumber == phoneNumber }

@@ -15,8 +15,11 @@ class CallDetectScreeningService : CallScreeningService() {
     if (callDetails.callDirection == Call.Details.DIRECTION_INCOMING) {
       val phoneNumber = callDetails.handle?.schemeSpecificPart ?: return
 
-      // handle blocking numbers
-      if (CallerManager.isPhoneNumberBlocked(phoneNumber)) {
+      // We have to make sure our number doesn't contain
+      // any characters other than numbers
+      val normalizedNumber = CallerManager.getNormalizedPhoneNumber(phoneNumber)
+
+      if (CallerManager.isPhoneNumberBlocked(normalizedNumber)) {
         Log.d("CallDetectScreeningService", "$phoneNumber is blocked")
 
         val response = CallResponse.Builder()
@@ -37,10 +40,11 @@ class CallDetectScreeningService : CallScreeningService() {
         .setSkipCallLog(false)
         .setSkipNotification(false)
         .build()
+      
+      CustomOverlayManager.callServiceNumber = normalizedNumber;
 
-
-      CustomOverlayManager.callServiceNumber = phoneNumber;
       respondToCall(callDetails, response)
     }
+
   }
 }

@@ -13,7 +13,7 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   // !! Make sure we have the same config as in DetetCallerId.swift !!
   let groupKey = "group.de.provectus.SecureContacts22";
   let dataKey = "callerId"; // this have to match with values in DetectCallerId.swift
-  
+
   // default, allAllowed, allBlocked, clearAll
   // allAllowed or allBlocked is set when vacation mode has been toggled
   var callerListType: String = "default";
@@ -87,7 +87,7 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
 
   // called when context is not incremental yet / empty
   private func addAllPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
-    NSLog("Adding all phone numbers:")
+    NSLog("Adding \(list.count) phone numbers")
 
     for item in list {
       if (item.isRemoved) {
