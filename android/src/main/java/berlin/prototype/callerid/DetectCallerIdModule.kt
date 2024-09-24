@@ -47,7 +47,19 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       promise.resolve("simulateIncomingCall with number $phoneNumber")
     }
 
+    @ReactMethod
+    fun getCallerIdMode(promise: Promise) {
+      if (workProfileAvailable) {
+        promise.resolve("workProfileMode")
+      }
 
+      if (contentProviderAvailable) {
+        promise.resolve("defaultMode")
+      }
+
+      promise.resolve("compatibilityMode")
+    }
+  
     @ReactMethod
     fun setCallerList(options: String, promise: Promise) {
       if (workProfileAvailable) {
@@ -79,22 +91,38 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     @ReactMethod
     fun checkPermissions(promise: Promise) {
+      if (workProfileAvailable) {
+        promise.reject("DetectCallerId", "permissions are checked by expo-contacts plugin in work profile mode")
+      }
+
       this.permissionsHelper.checkPermissions(promise)
     }
 
     @ReactMethod
     fun requestPhonePermission(promise: Promise) {
+      if (workProfileAvailable) {
+        promise.reject("DetectCallerId", "permissions are requested by expo-contacts plugin in work profile mode")
+      }
+
       this.permissionsHelper.requestPhonePermission(promise)
     }
 
     @ReactMethod
     fun requestOverlayPermission(promise: Promise) {
+      if (workProfileAvailable) {
+        promise.reject("DetectCallerId", "permissions are requested by expo-contacts plugin in work profile mode")
+      }
+
       this.permissionsHelper.requestOverlayPermission(promise)
     }
 
     @RequiresApi(api = Build.VERSION_CODES.Q)
     @ReactMethod
     fun requestServicePermission(promise: Promise) {
+      if (workProfileAvailable) {
+        promise.reject("DetectCallerId", "permissions are requested by expo-contacts plugin in work profile mode")
+      }
+
       this.permissionsHelper.requestServicePermission(promise)
     }
 

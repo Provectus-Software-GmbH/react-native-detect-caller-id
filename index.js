@@ -15,6 +15,7 @@ let CallerDetector = {
         items: { label: string; phonenumber: number, isRemoved: boolean, isBlocked: boolean }[],
     }) => { },
     clearCallerList: async () => { },
+    getCallerIdMode: async () => { },
     reloadExtension: async () => { },
     simulateIncomingCall: async (phonenumber: number) => { },
 }
@@ -85,6 +86,15 @@ CallerDetector.setCallerList = async (options) => {
 
 CallerDetector.clearCallerList = async () => {
   return CallerId.clearCallerList();
+};
+
+// android only! returns workProfileMode, defaultMode or compatibilityMode
+CallerDetector.getCallerIdMode = async () => {
+  try {
+    return CallerId.getCallerIdMode();
+  } catch (error) {
+    throw error;
+  }
 };
 
 

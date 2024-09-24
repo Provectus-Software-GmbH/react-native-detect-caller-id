@@ -45,7 +45,7 @@ class CallDetectScreeningService : CallScreeningService() {
         .setSkipCallLog(false)
         .setSkipNotification(false)
         .build()
-      
+
       CustomOverlayManager.callServiceNumber = normalizedNumber;
 
       respondToCall(callDetails, response)
