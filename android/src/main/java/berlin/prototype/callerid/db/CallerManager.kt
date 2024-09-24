@@ -14,7 +14,8 @@ import java.io.OutputStreamWriter
 
 @RequiresApi(Build.VERSION_CODES.N)
 object CallerManager {
-  var contentProviderAvailable = false
+  var contentProviderAvailable = false // true for default mode, false for compatibility mode
+  var workProfileAvailable = false // true for work profile mode (SyncToLocalContacts)
 
   private val blockedCallers = mutableListOf<Caller>()
   private val allowedCallers = mutableListOf<Caller>()
@@ -24,9 +25,16 @@ object CallerManager {
 
   private var appContext: ReactApplicationContext? = null
 
-  fun initialize(context: ReactApplicationContext, contentProvider: Boolean) {
+  fun initialize(context: ReactApplicationContext, contentProvider: Boolean, workProfile: Boolean) {
     appContext = context
     contentProviderAvailable = contentProvider
+    workProfileAvailable = workProfile
+
+    // allowed and blocked callers are handled by system contacts app / expo-contacts plugin
+    if (workProfileAvailable) {
+      return
+    }
+
     allowedCallers.addAll(getSavedCallerList(ALLOWED_CALLERS_FILE))
     blockedCallers.addAll(getSavedCallerList(BLOCKED_CALLERS_FILE))
 

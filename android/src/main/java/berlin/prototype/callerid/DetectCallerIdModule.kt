@@ -1,5 +1,6 @@
 package berlin.prototype.callerid
 
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.os.Build
 import android.telecom.TelecomManager
@@ -17,7 +18,8 @@ import org.json.JSONObject
 @RequiresApi(Build.VERSION_CODES.Q)
 class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   private val context = reactContext
-  private var contentProviderAvailable = false
+  private var contentProviderAvailable = false // true for default mode, false for compatibility mode
+  private var workProfileAvailable = false // true for work profile mode (SyncToLocalContacts)
 
   // Declare CallManager with the current context
   private val callManager = CallManager(context)
@@ -29,7 +31,10 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     override fun initialize() {
       super.initialize()
       contentProviderAvailable = hasGenuineAndroidDefaultDialer()
-      CallerManager.initialize(context, contentProviderAvailable)
+      workProfileAvailable = isInstalledOnWorkProfile()
+
+      // CallerManager also stores flags for contentProvider and workProfile mode
+      CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
     }
 
     @ReactMethod
@@ -45,6 +50,10 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     @ReactMethod
     fun setCallerList(options: String, promise: Promise) {
+      if (workProfileAvailable) {
+        promise.reject("DetectCallerId", "Setting up caller ids in work profile mode is not supported by this plugin")
+      }
+
       try {
         val jsonObject = JSONObject(options)
         CallerManager.updateCallers(jsonObject.getJSONArray("items"), jsonObject.getString("type"))
@@ -60,9 +69,12 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     @ReactMethod
     fun clearCallerList(promise: Promise) {
+      if (workProfileAvailable) {
+        promise.reject("DetectCallerId", "Removing caller ids in work profile mode is not supported by this plugin")
+      }
+
       CallerManager.clearAllCallerLists()
       promise.resolve("caller list cleared")
-
     }
 
     @ReactMethod
@@ -101,5 +113,19 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
       return curDefaultDialer == "com.google.android.dialer" ||
         curDefaultDialer == "com.android.dialer"
+    }
+
+    private fun isInstalledOnWorkProfile(): Boolean {
+      // Get the DevicePolicyManager service
+      val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+      // Get the list of active admins
+      val activeAdmins = devicePolicyManager?.activeAdmins ?: return false
+      for (admin in activeAdmins) {
+        // Check if the package is a profile owner app
+        if (devicePolicyManager.isProfileOwnerApp(admin.packageName)) {
+          return true
+        }
+      }
+      return false
     }
 }

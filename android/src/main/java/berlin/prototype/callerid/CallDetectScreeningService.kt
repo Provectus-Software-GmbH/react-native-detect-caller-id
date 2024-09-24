@@ -10,6 +10,11 @@ import berlin.prototype.callerid.db.CallerManager
 @RequiresApi(Build.VERSION_CODES.Q)
 class CallDetectScreeningService : CallScreeningService() {
   override fun onScreenCall(callDetails: Call.Details) {
+    // system contacts app will handle incoming calls
+    if (CallerManager.workProfileAvailable) {
+      return
+    }
+
     Log.d("CallDetectScreeningService", "onScreenCall")
 
     if (callDetails.callDirection == Call.Details.DIRECTION_INCOMING) {

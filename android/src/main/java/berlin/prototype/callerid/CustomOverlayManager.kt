@@ -26,9 +26,13 @@ import berlin.prototype.callerid.db.CallerManager
 @RequiresApi(Build.VERSION_CODES.N)
 class CustomOverlayManager : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (!Settings.canDrawOverlays(context) || CallerManager.contentProviderAvailable) {
+        if (
+          CallerManager.contentProviderAvailable ||
+          CallerManager.workProfileAvailable ||
+          !Settings.canDrawOverlays(context)) {
             return
         }
+
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
         if (state == TelephonyManager.EXTRA_STATE_RINGING) {
             if (!isShowingOverlay) {
