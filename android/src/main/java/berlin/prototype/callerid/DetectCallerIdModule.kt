@@ -59,7 +59,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
       promise.resolve("compatibilityMode")
     }
-  
+
     @ReactMethod
     fun setCallerList(options: String, promise: Promise) {
       if (workProfileAvailable) {

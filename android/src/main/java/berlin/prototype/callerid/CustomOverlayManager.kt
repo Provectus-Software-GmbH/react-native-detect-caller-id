@@ -184,10 +184,8 @@ class CustomOverlayManager : BroadcastReceiver() {
         if (overlay != null) {
             val windowManager: WindowManager =
                 context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            if (windowManager != null) {
-                windowManager.removeView(overlay)
-                overlay = null
-            }
+          windowManager.removeView(overlay)
+          overlay = null
         }
     }
 

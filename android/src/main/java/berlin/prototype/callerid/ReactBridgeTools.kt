@@ -75,8 +75,8 @@ object ReactBridgeTools {
         ReadableType.Boolean -> jsonArray.put(readableArray.getBoolean(i))
         ReadableType.Number -> jsonArray.put(readableArray.getDouble(i))
         ReadableType.String -> jsonArray.put(readableArray.getString(i))
-        ReadableType.Map -> jsonArray.put(convertMapToJson(readableArray.getMap(i)!!))
-        ReadableType.Array -> jsonArray.put(convertArrayToJson(readableArray.getArray(i)!!))
+        ReadableType.Map -> jsonArray.put(convertMapToJson(readableArray.getMap(i)))
+        ReadableType.Array -> jsonArray.put(convertArrayToJson(readableArray.getArray(i)))
       }
     }
     return jsonArray
