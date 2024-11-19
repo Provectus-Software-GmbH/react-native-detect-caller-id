@@ -14,6 +14,7 @@ class DetectCallerId: NSObject {
         withResolver resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject:  @escaping RCTPromiseRejectBlock
     ) -> Void {
+        NSLog("setCallerList")
           if let userDefaults = UserDefaults(suiteName: groupKey) {
             userDefaults.set(options, forKey: dataKey)
 
@@ -48,6 +49,7 @@ class DetectCallerId: NSObject {
     func checkPermissions(
         _ resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+            NSLog("checkPermissions")
         CXCallDirectoryManager.sharedInstance.getEnabledStatusForExtension(withIdentifier: identifier, completionHandler: { enabledStatus, error -> Void in
             if (enabledStatus.rawValue == 0){
                 reject("DetectCallerId", "getExtensionEnabledStatus error - Failed to get extension status: " + (error?.localizedDescription ?? ""), error);
@@ -63,6 +65,7 @@ class DetectCallerId: NSObject {
     func requestPermissions(
         _ resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+            NSLog("requestPermissions")
 
         if #available(iOS 13.4, *) {
             CXCallDirectoryManager.sharedInstance.openSettings(completionHandler: { error -> Void in
@@ -82,6 +85,7 @@ class DetectCallerId: NSObject {
     func reloadExtension(
         _ resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+            NSLog("reloadExtension")
         do {
             CXCallDirectoryManager.sharedInstance.reloadExtension(withIdentifier: identifier, completionHandler: {error -> Void in
                 self.clearStore();
@@ -143,6 +147,7 @@ class DetectCallerId: NSObject {
     }
 
     private func clearStore() -> Void {
+        NSLog("clearStore")
       if let userDefaults = UserDefaults(suiteName: groupKey) {
           userDefaults.removeObject(forKey: dataKey)
           NSLog("clean up temp store")
