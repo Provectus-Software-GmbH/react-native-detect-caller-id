@@ -14,12 +14,23 @@ class DetectCallerId: NSObject {
         withResolver resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject:  @escaping RCTPromiseRejectBlock
     ) -> Void {
-        NSLog("setCallerList")
-          if let userDefaults = UserDefaults(suiteName: groupKey) {
-            userDefaults.set(options, forKey: dataKey)
-
-            // our CallDirectoryHandler will parse json stringified callerList
-            reloadExtension(resolve, withRejecter: reject);
+        // Get the shared container URL using your group key.
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
+            // Choose a file name for your caller list.
+            let fileURL = containerURL.appendingPathComponent("callerList.json")
+            
+            do {
+                // Write the JSON string to the file.
+                try options.write(to: fileURL, atomically: true, encoding: .utf8)
+                
+                // Call your reload extension function after successfully writing the file.
+                reloadExtension(resolve, withRejecter: reject)
+            } catch {
+                // Reject the promise if file writing fails.
+                reject("FILE_WRITE_ERROR", "Unable to write caller list to file", error)
+            }
+        } else {
+            reject("GROUP_ERROR", "Unable to access shared container for group \(groupKey)", nil)
         }
     }
 
