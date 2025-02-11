@@ -19,38 +19,44 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   var callerListType: String = "default";
 
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
-    context.delegate = self
+      context.delegate = self
 
-    if let userDefaults = UserDefaults(suiteName: groupKey) {
-      if let jsonString = userDefaults.string(forKey: dataKey) {
-        let callerList = parseCallerList(from: jsonString)
-
-        if context.isIncremental {
-          // on logout
-          if (callerListType == "clearAll") {
-            NSLog("CallDirectoryHandler: remove all blocking and identification entries")
-            context.removeAllIdentificationEntries()
-            context.removeAllBlockingEntries()
-          } else if (callerListType != "default") {
-            addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
-          } else {
-            addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
+      // Access the shared container using your group key.
+      if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
+          let fileURL = containerURL.appendingPathComponent("callerList.json")
+          
+          do {
+              // Try to read the JSON string from the file.
+              let jsonString = try String(contentsOf: fileURL, encoding: .utf8)
+              let callerList = parseCallerList(from: jsonString)
+              
+              // Continue with your logic as before.
+              if context.isIncremental {
+                  if (callerListType == "clearAll") {
+                      NSLog("CallDirectoryHandler: remove all blocking and identification entries")
+                      context.removeAllIdentificationEntries()
+                      context.removeAllBlockingEntries()
+                  } else if (callerListType != "default") {
+                      addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
+                  } else {
+                      addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
+                  }
+              } else {
+                  addAllPhoneNumbers(callerList, to: context)
+              }
+          } catch {
+              NSLog("CallDirectoryHandler: Error reading file - \(error)")
           }
-        } else {
-          addAllPhoneNumbers(callerList, to: context)
-        }
       } else {
-        NSLog("CallDirectoryHandler: no items")
+          NSLog("CallDirectoryHandler: Unable to access shared container with group \(groupKey)")
       }
-    } else {
-      NSLog("CallDirectoryHandler: UserDefaults group empty or not found")
-    }
-
-    context.completeRequest()
+      
+      context.completeRequest()
   }
 
   // vacation mode toggle -> remove all blocked/allowed and add all allowed/blocked afterwards
   private func addAllBlockedOrIdentificationPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+      NSLog("addAllBlockedOrIdentificationPhoneNumbers")
     if (callerListType == "allAllowed") {
       NSLog("CallDirectoryHandler: remove all blocking entries")
       context.removeAllBlockingEntries()
@@ -64,6 +70,7 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
 
 
   private func addOrRemoveIncrementalPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+    NSLog("addOrRemoveIncrementalPhoneNumbers")
     for item in list {
       if item.isBlocked {
         if item.isRemoved {
@@ -86,25 +93,29 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   }
 
   // called when context is not incremental yet / empty
-  private func addAllPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
-    NSLog("Adding \(list.count) phone numbers")
+    private func addAllPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+        NSLog("addAllPhoneNumbers")
+        let batchSize = 5000 // Set a reasonable batch size
+        for batchStart in stride(from: 0, to: list.count, by: batchSize) {
+            let batch = list[batchStart..<min(batchStart + batchSize, list.count)]
 
-    for item in list {
-      if (item.isRemoved) {
-        continue;
-      }
-
-      if (item.isBlocked) {
-        NSLog("add blocking entry: \(item.label) \(item.phoneNumber)")
-        context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
-      } else {
-        NSLog("add identification entry: \(item.label) \(item.phoneNumber)")
-        context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
-      }
+            for item in batch {
+                if item.isRemoved { continue }
+                if item.isBlocked {
+                    context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
+                } else {
+                    context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
+                }
+            }
+            
+            NSLog("Processed batch \(batchStart / batchSize + 1) of \(list.count / batchSize + 1)")
+            
+            // Check if time or memory limits are close and stop if necessary
+        }
     }
-  }
 
   private func parseCallerList(from jsonString: String) -> [CallerItem] {
+    NSLog("parseCallerList")
     guard let jsonData = jsonString.data(using: .utf8) else {
       NSLog("Failed to convert JSON string")
 

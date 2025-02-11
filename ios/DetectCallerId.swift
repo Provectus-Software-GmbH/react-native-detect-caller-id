@@ -14,11 +14,23 @@ class DetectCallerId: NSObject {
         withResolver resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject:  @escaping RCTPromiseRejectBlock
     ) -> Void {
-          if let userDefaults = UserDefaults(suiteName: groupKey) {
-            userDefaults.set(options, forKey: dataKey)
-
-            // our CallDirectoryHandler will parse json stringified callerList
-            reloadExtension(resolve, withRejecter: reject);
+        // Get the shared container URL using your group key.
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
+            // Choose a file name for your caller list.
+            let fileURL = containerURL.appendingPathComponent("callerList.json")
+            
+            do {
+                // Write the JSON string to the file.
+                try options.write(to: fileURL, atomically: true, encoding: .utf8)
+                
+                // Call your reload extension function after successfully writing the file.
+                reloadExtension(resolve, withRejecter: reject)
+            } catch {
+                // Reject the promise if file writing fails.
+                reject("FILE_WRITE_ERROR", "Unable to write caller list to file", error)
+            }
+        } else {
+            reject("GROUP_ERROR", "Unable to access shared container for group \(groupKey)", nil)
         }
     }
 
@@ -48,6 +60,7 @@ class DetectCallerId: NSObject {
     func checkPermissions(
         _ resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+            NSLog("checkPermissions")
         CXCallDirectoryManager.sharedInstance.getEnabledStatusForExtension(withIdentifier: identifier, completionHandler: { enabledStatus, error -> Void in
             if (enabledStatus.rawValue == 0){
                 reject("DetectCallerId", "getExtensionEnabledStatus error - Failed to get extension status: " + (error?.localizedDescription ?? ""), error);
@@ -63,6 +76,7 @@ class DetectCallerId: NSObject {
     func requestPermissions(
         _ resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+            NSLog("requestPermissions")
 
         if #available(iOS 13.4, *) {
             CXCallDirectoryManager.sharedInstance.openSettings(completionHandler: { error -> Void in
@@ -82,6 +96,7 @@ class DetectCallerId: NSObject {
     func reloadExtension(
         _ resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+            NSLog("reloadExtension")
         do {
             CXCallDirectoryManager.sharedInstance.reloadExtension(withIdentifier: identifier, completionHandler: {error -> Void in
                 self.clearStore();
@@ -143,6 +158,7 @@ class DetectCallerId: NSObject {
     }
 
     private func clearStore() -> Void {
+        NSLog("clearStore")
       if let userDefaults = UserDefaults(suiteName: groupKey) {
           userDefaults.removeObject(forKey: dataKey)
           NSLog("clean up temp store")

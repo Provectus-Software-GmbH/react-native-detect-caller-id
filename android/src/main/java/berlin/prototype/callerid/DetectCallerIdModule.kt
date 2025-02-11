@@ -61,23 +61,39 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun setCallerList(options: String, promise: Promise) {
-      if (workProfileAvailable) {
-        promise.reject("DetectCallerId", "Setting up caller ids in work profile mode is not supported by this plugin")
+    fun syncContacts(options: String, isVacationModeActive: Boolean, promise: Promise) {
+      if (!workProfileAvailable) {
+        promise.reject("DetectCallerId", "Syncing contacts while not in work profile mode is not supported by this plugin")
       }
 
       try {
-        val jsonObject = JSONObject(options)
-        CallerManager.updateCallers(jsonObject.getJSONArray("items"), jsonObject.getString("type"))
-
-        //promise.resolve(convertJsonToMap(jsonObject))
-        promise.resolve("caller list updated")
+        SyncContactsManager.syncContacts(options, isVacationModeActive, promise);
+        promise.resolve("synced to local contacts")
       } catch (e: JSONException) {
         e.printStackTrace()
         // Reject the promise with an error message
-        promise.reject("PARSE_ERROR", "Failed to parse JSON", e)
+        promise.reject("SYNC_ERROR", "Failed to sync contacts", e)
       }
     }
+
+  @ReactMethod
+  fun setCallerList(options: String, promise: Promise) {
+    if (workProfileAvailable) {
+      promise.reject("DetectCallerId", "Setting up caller ids in work profile mode is not supported by this plugin")
+    }
+
+    try {
+      val jsonObject = JSONObject(options)
+      CallerManager.updateCallers(jsonObject.getJSONArray("items"), jsonObject.getString("type"))
+
+      //promise.resolve(convertJsonToMap(jsonObject))
+      promise.resolve("caller list updated")
+    } catch (e: JSONException) {
+      e.printStackTrace()
+      // Reject the promise with an error message
+      promise.reject("PARSE_ERROR", "Failed to parse JSON", e)
+    }
+  }
 
     @ReactMethod
     fun clearCallerList(promise: Promise) {

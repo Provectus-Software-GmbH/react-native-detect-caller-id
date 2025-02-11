@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		54B3973A2CEC7C7E00F53F46 /* CallDirectoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B397382CEC7C7E00F53F46 /* CallDirectoryHandler.swift */; };
 		F4FF95D7245B92E800C19C63 /* DetectCallerId.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FF95D6245B92E800C19C63 /* DetectCallerId.swift */; };
 /* End PBXBuildFile section */
 
@@ -24,6 +25,7 @@
 
 /* Begin PBXFileReference section */
 		134814201AA4EA6300B7C361 /* libDetectCallerId.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libDetectCallerId.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		54B397382CEC7C7E00F53F46 /* CallDirectoryHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallDirectoryHandler.swift; sourceTree = "<group>"; };
 		B3E7B5891CC2AC0600A0062D /* DetectCallerId.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DetectCallerId.m; sourceTree = "<group>"; };
 		F4FF95D5245B92E700C19C63 /* DetectCallerId-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "DetectCallerId-Bridging-Header.h"; sourceTree = "<group>"; };
 		F4FF95D6245B92E800C19C63 /* DetectCallerId.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectCallerId.swift; sourceTree = "<group>"; };
@@ -48,10 +50,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		54B397392CEC7C7E00F53F46 /* CallDirectoryExtension */ = {
+			isa = PBXGroup;
+			children = (
+				54B397382CEC7C7E00F53F46 /* CallDirectoryHandler.swift */,
+			);
+			path = CallDirectoryExtension;
+			sourceTree = "<group>";
+		};
 		58B511D21A9E6C8500147676 = {
 			isa = PBXGroup;
 			children = (
 				F4FF95D6245B92E800C19C63 /* DetectCallerId.swift */,
+				54B397392CEC7C7E00F53F46 /* CallDirectoryExtension */,
 				B3E7B5891CC2AC0600A0062D /* DetectCallerId.m */,
 				F4FF95D5245B92E700C19C63 /* DetectCallerId-Bridging-Header.h */,
 				134814211AA4EA7D00B7C361 /* Products */,
@@ -115,6 +126,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				54B3973A2CEC7C7E00F53F46 /* CallDirectoryHandler.swift in Sources */,
 				F4FF95D7245B92E800C19C63 /* DetectCallerId.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -17,7 +17,8 @@ let CallerDetector = {
     clearCallerList: async () => { },
     getCallerIdMode: async () => { },
     reloadExtension: async () => { },
-    simulateIncomingCall: async (phonenumber: number) => { },
+    simulateIncomingCall: async (phonenumber: string) => { },
+    syncContacts: async(items: any[], isVacationModeActive: boolean) => {},
 }
 
 // ios:  returns "denied" or "granted"
@@ -86,6 +87,18 @@ CallerDetector.setCallerList = async (options) => {
 
 CallerDetector.clearCallerList = async () => {
   return CallerId.clearCallerList();
+};
+
+CallerDetector.syncContacts = async (items, isVacationModeActive) => {
+    try {
+        if (Platform.OS === 'android') {
+            return CallerId.syncContacts(items, isVacationModeActive);
+        } else {
+            throw new Error('This method is Android only');
+        }
+    } catch (error) {
+        throw error;
+    }
 };
 
 // android only! returns workProfileMode, defaultMode or compatibilityMode
