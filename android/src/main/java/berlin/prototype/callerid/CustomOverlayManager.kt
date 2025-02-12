@@ -1,5 +1,7 @@
 package berlin.prototype.callerid
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -21,6 +23,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.RequiresApi
+import androidx.core.app.NotificationCompat
 import berlin.prototype.callerid.db.CallerManager
 
 @RequiresApi(Build.VERSION_CODES.N)
@@ -53,8 +56,18 @@ class CustomOverlayManager : BroadcastReceiver() {
                 isShowingOverlay = false
                 callServiceNumber = null
                 dismissCallerInfo(context)
-
             }
+
+            // Create Samsung notification
+            val phoneNumber = callServiceNumber ?: return
+            val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
+            val parts = caller.label.split(",", limit = 2)
+            val callerName = parts[0].trim()
+            showLocalNotification(
+                context = context,
+                title = "${callerName}",
+                content = "Missed call",
+            )
         }
     }
 
@@ -187,6 +200,28 @@ class CustomOverlayManager : BroadcastReceiver() {
           windowManager.removeView(overlay)
           overlay = null
         }
+    }
+
+    fun showLocalNotification(context: Context, title: String, content: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "missed_call_channel"
+
+        // For Android Oreo and above, create a notification channel.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channelName = "Missed Call Notifications"
+            val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT)
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)  // Use your own icon here
+            .setContentTitle(title)
+            .setContentText(content)
+            .setAutoCancel(true)
+            .build()
+
+        // Use a constant or generate a unique ID for each notification.
+        notificationManager.notify(1001, notification)
     }
 
     companion object {

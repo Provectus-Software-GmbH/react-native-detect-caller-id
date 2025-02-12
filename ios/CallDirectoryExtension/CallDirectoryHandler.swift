@@ -19,35 +19,39 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   var callerListType: String = "default";
 
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
-    NSLog("beginRequest")
-    context.delegate = self
+      context.delegate = self
 
-    if let userDefaults = UserDefaults(suiteName: groupKey) {
-      if let jsonString = userDefaults.string(forKey: dataKey) {
-        let callerList = parseCallerList(from: jsonString)
-
-        if context.isIncremental {
-          // on logout
-          if (callerListType == "clearAll") {
-            NSLog("CallDirectoryHandler: remove all blocking and identification entries")
-            context.removeAllIdentificationEntries()
-            context.removeAllBlockingEntries()
-          } else if (callerListType != "default") {
-            addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
-          } else {
-            addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
+      // Access the shared container using your group key.
+      if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
+          let fileURL = containerURL.appendingPathComponent("callerList.json")
+          
+          do {
+              // Try to read the JSON string from the file.
+              let jsonString = try String(contentsOf: fileURL, encoding: .utf8)
+              let callerList = parseCallerList(from: jsonString)
+              
+              // Continue with your logic as before.
+              if context.isIncremental {
+                  if (callerListType == "clearAll") {
+                      NSLog("CallDirectoryHandler: remove all blocking and identification entries")
+                      context.removeAllIdentificationEntries()
+                      context.removeAllBlockingEntries()
+                  } else if (callerListType != "default") {
+                      addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
+                  } else {
+                      addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
+                  }
+              } else {
+                  addAllPhoneNumbers(callerList, to: context)
+              }
+          } catch {
+              NSLog("CallDirectoryHandler: Error reading file - \(error)")
           }
-        } else {
-          addAllPhoneNumbers(callerList, to: context)
-        }
       } else {
-        NSLog("CallDirectoryHandler: no items")
+          NSLog("CallDirectoryHandler: Unable to access shared container with group \(groupKey)")
       }
-    } else {
-      NSLog("CallDirectoryHandler: UserDefaults group empty or not found")
-    }
-
-    context.completeRequest()
+      
+      context.completeRequest()
   }
 
   // vacation mode toggle -> remove all blocked/allowed and add all allowed/blocked afterwards
