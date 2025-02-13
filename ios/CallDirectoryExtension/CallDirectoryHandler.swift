@@ -1,4 +1,3 @@
-
 import Foundation
 import CallKit
 
@@ -20,27 +19,40 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
 
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
       context.delegate = self
+      NSLog("CallDirectoryHandler: beginRequest")
 
       // Access the shared container using your group key.
       if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
           let fileURL = containerURL.appendingPathComponent("callerList.json")
-          
+
           do {
-              // Try to read the JSON string from the file.
-              let jsonString = try String(contentsOf: fileURL, encoding: .utf8)
-              let callerList = parseCallerList(from: jsonString)
-              
+            // Use the new parseCallerList function that loads data with memory mapping.
+            let callerList = parseCallerList(fromFileURL: fileURL)
+
+            // Log the total count of callerList entries.
+            NSLog("CallDirectoryHandler: Total callerList count: \(callerList.count)")
+
               // Continue with your logic as before.
               if context.isIncremental {
-                  if (callerListType == "clearAll") {
+                switch callerListType {
+                  case "clearAll":
                       NSLog("CallDirectoryHandler: remove all blocking and identification entries")
                       context.removeAllIdentificationEntries()
                       context.removeAllBlockingEntries()
-                  } else if (callerListType != "default") {
+
+                  case "allBlocked":
+                      addAllPhoneNumbers(callerList, to: context)
+
+                  case "allAllowed":
                       addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
-                  } else {
+
+                  case "default":
                       addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
-                  }
+
+                  default:
+                      // Optionally handle any unexpected callerListType values
+                      NSLog("CallDirectoryHandler: unrecognized callerListType \(callerListType)")
+                }
               } else {
                   addAllPhoneNumbers(callerList, to: context)
               }
@@ -50,7 +62,7 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
       } else {
           NSLog("CallDirectoryHandler: Unable to access shared container with group \(groupKey)")
       }
-      
+
       context.completeRequest()
   }
 
@@ -67,7 +79,6 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
 
     addAllPhoneNumbers(list, to: context)
   }
-
 
   private func addOrRemoveIncrementalPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
     NSLog("addOrRemoveIncrementalPhoneNumbers")
@@ -107,56 +118,62 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
                     context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
                 }
             }
-            
+
             NSLog("Processed batch \(batchStart / batchSize + 1) of \(list.count / batchSize + 1)")
-            
             // Check if time or memory limits are close and stop if necessary
         }
     }
 
-  private func parseCallerList(from jsonString: String) -> [CallerItem] {
-    NSLog("parseCallerList")
-    guard let jsonData = jsonString.data(using: .utf8) else {
-      NSLog("Failed to convert JSON string")
+  private func parseCallerList(fromFileURL fileURL: URL) -> [CallerItem] {
+      NSLog("parseCallerList")
+      do {
+          // Use memory mapping to load the file data without loading the entire file into memory at once.
+          let jsonData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
 
-      return []
-    }
+          // Deserialize the JSON data.
+          if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
 
-    do {
-      if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+              // Update the callerListType if available.
+              if let type = jsonObject["type"] as? String {
+                  callerListType = type
+              }
 
-        if let type = jsonObject["type"] as? String {
-          callerListType = type;
-        }
-
-        if let items = jsonObject["items"] as? [[String: Any]] {
-          return items.compactMap { dict in
-            guard let label = dict["label"] as? String,
-                  let phoneNumber = dict["phonenumber"] as? Int64,
-                  let isRemoved = dict["isRemoved"] as? Bool,
-                  let isBlocked = dict["isBlocked"] as? Bool else {
-              return nil
-            }
-            return CallerItem(label: label, phoneNumber: phoneNumber, isRemoved: isRemoved, isBlocked: isBlocked)
+              // Process the items array.
+              if let items = jsonObject["items"] as? [[String: Any]] {
+                  return items.compactMap { dict in
+                      guard let label = dict["label"] as? String,
+                            let phoneNumber = dict["phonenumber"] as? Int64,
+                            let isRemoved = dict["isRemoved"] as? Bool,
+                            let isBlocked = dict["isBlocked"] as? Bool else {
+                          return nil
+                      }
+                      return CallerItem(label: label, phoneNumber: phoneNumber, isRemoved: isRemoved, isBlocked: isBlocked)
+                  }
+              } else {
+                  NSLog("Failed to cast JSON data to array")
+                  return []
+              }
+          } else {
+              NSLog("Failed to cast JSON data to object")
+              return []
           }
-        } else {
-          NSLog("Failed to cast JSON data to array")
+      } catch let error {
+          NSLog("Error deserializing JSON: \(error.localizedDescription)")
           return []
-        }
-      } else {
-        NSLog("Failed to cast JSON data to object")
-        return []
       }
-    } catch let error {
-      NSLog("Error deserializing JSON: \(error.localizedDescription)")
-      return []
-    }
   }
+
 }
 
 extension CallDirectoryHandler: CXCallDirectoryExtensionContextDelegate {
 
   func requestFailed(for extensionContext: CXCallDirectoryExtensionContext, withError error: Error) {
     NSLog("requestFailed: "+error.localizedDescription)
+    extensionContext.removeAllIdentificationEntries()
+    extensionContext.removeAllBlockingEntries()
+  }
+
+  func requestDidComplete(for extensionContext: CXCallDirectoryExtensionContext) {
+    NSLog("requestDidComplete")
   }
 }
