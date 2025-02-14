@@ -24,14 +24,15 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
       // Access the shared container using your group key.
       if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
           let fileURL = containerURL.appendingPathComponent("callerList.json")
-
+          
           do {
             // Use the new parseCallerList function that loads data with memory mapping.
             let callerList = parseCallerList(fromFileURL: fileURL)
-
+            
             // Log the total count of callerList entries.
             NSLog("CallDirectoryHandler: Total callerList count: \(callerList.count)")
-
+            NSLog("CallDirectoryHandler: callerListType: \(callerListType)")
+            
               // Continue with your logic as before.
               if context.isIncremental {
                 switch callerListType {
@@ -39,16 +40,16 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
                       NSLog("CallDirectoryHandler: remove all blocking and identification entries")
                       context.removeAllIdentificationEntries()
                       context.removeAllBlockingEntries()
-
+                      
                   case "allBlocked":
-                      addAllPhoneNumbers(callerList, to: context)
-
+                      addIdentifyAndBlockEntries(callerList, to: context)
+                  
                   case "allAllowed":
-                      addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
-
+                      addAllPhoneNumbers(callerList, to: context)
+                      
                   case "default":
-                      addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
-
+                      addAllPhoneNumbers(callerList, to: context)
+                      
                   default:
                       // Optionally handle any unexpected callerListType values
                       NSLog("CallDirectoryHandler: unrecognized callerListType \(callerListType)")
@@ -62,65 +63,28 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
       } else {
           NSLog("CallDirectoryHandler: Unable to access shared container with group \(groupKey)")
       }
-
+      
       context.completeRequest()
   }
-
-  // vacation mode toggle -> remove all blocked/allowed and add all allowed/blocked afterwards
-  private func addAllBlockedOrIdentificationPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
-      NSLog("addAllBlockedOrIdentificationPhoneNumbers")
-    if (callerListType == "allAllowed") {
-      NSLog("CallDirectoryHandler: remove all blocking entries")
-      context.removeAllBlockingEntries()
-    } else {
-      NSLog("CallDirectoryHandler: remove all identification entries")
-      context.removeAllIdentificationEntries()
-    }
-
-    addAllPhoneNumbers(list, to: context)
-  }
-
-  private func addOrRemoveIncrementalPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+  
+  private func addIdentifyAndBlockEntries(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
     NSLog("addOrRemoveIncrementalPhoneNumbers")
     for item in list {
       if item.isBlocked {
-        if item.isRemoved {
-          NSLog("inc remove blocking entry: \(item.label) \(item.phoneNumber)")
-          context.removeBlockingEntry(withPhoneNumber: item.phoneNumber)
-        } else {
           NSLog("inc add blocking entry: \(item.label) \(item.phoneNumber)")
           context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
-        }
-      } else {
-        if item.isRemoved {
-          NSLog("inc remove identification entry: \(item.label) \(item.phoneNumber)")
-          context.removeIdentificationEntry(withPhoneNumber: item.phoneNumber)
-        } else {
-          NSLog("inc add identification entry: \(item.label) \(item.phoneNumber)")
-          context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
-        }
       }
+      NSLog("inc add identification entry: \(item.label) \(item.phoneNumber)")
+      context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
     }
   }
 
   // called when context is not incremental yet / empty
     private func addAllPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
         NSLog("addAllPhoneNumbers")
-        let batchSize = 5000 // Set a reasonable batch size
-        for batchStart in stride(from: 0, to: list.count, by: batchSize) {
-            let batch = list[batchStart..<min(batchStart + batchSize, list.count)]
-
-            for item in batch {
-                if item.isRemoved { continue }
-                if item.isBlocked {
-                    context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
-                } else {
-                    context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
-                }
-            }
-
-            NSLog("Processed batch \(batchStart / batchSize + 1) of \(list.count / batchSize + 1)")
-            // Check if time or memory limits are close and stop if necessary
+        for item in list {
+            if item.isRemoved { continue }
+            context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
         }
     }
 
@@ -129,15 +93,15 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
       do {
           // Use memory mapping to load the file data without loading the entire file into memory at once.
           let jsonData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-
+          
           // Deserialize the JSON data.
           if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
-
+              
               // Update the callerListType if available.
               if let type = jsonObject["type"] as? String {
                   callerListType = type
               }
-
+              
               // Process the items array.
               if let items = jsonObject["items"] as? [[String: Any]] {
                   return items.compactMap { dict in
@@ -162,7 +126,7 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
           return []
       }
   }
-
+  
 }
 
 extension CallDirectoryHandler: CXCallDirectoryExtensionContextDelegate {
@@ -172,7 +136,7 @@ extension CallDirectoryHandler: CXCallDirectoryExtensionContextDelegate {
     extensionContext.removeAllIdentificationEntries()
     extensionContext.removeAllBlockingEntries()
   }
-
+  
   func requestDidComplete(for extensionContext: CXCallDirectoryExtensionContext) {
     NSLog("requestDidComplete")
   }
