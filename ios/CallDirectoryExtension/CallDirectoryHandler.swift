@@ -1,3 +1,4 @@
+
 import Foundation
 import CallKit
 
@@ -19,41 +20,27 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
 
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
       context.delegate = self
-      NSLog("CallDirectoryHandler: beginRequest")
 
       // Access the shared container using your group key.
       if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
           let fileURL = containerURL.appendingPathComponent("callerList.json")
           
           do {
-            // Use the new parseCallerList function that loads data with memory mapping.
-            let callerList = parseCallerList(fromFileURL: fileURL)
-            
-            // Log the total count of callerList entries.
-            NSLog("CallDirectoryHandler: Total callerList count: \(callerList.count)")
-            NSLog("CallDirectoryHandler: callerListType: \(callerListType)")
-            
+              // Try to read the JSON string from the file.
+              let jsonString = try String(contentsOf: fileURL, encoding: .utf8)
+              let callerList = parseCallerList(from: jsonString)
+              
               // Continue with your logic as before.
               if context.isIncremental {
-                switch callerListType {
-                  case "clearAll":
+                  if (callerListType == "clearAll") {
                       NSLog("CallDirectoryHandler: remove all blocking and identification entries")
                       context.removeAllIdentificationEntries()
                       context.removeAllBlockingEntries()
-                      
-                  case "allBlocked":
-                      addIdentifyAndBlockEntries(callerList, to: context)
-                  
-                  case "allAllowed":
-                      addAllPhoneNumbers(callerList, to: context)
-                      
-                  case "default":
-                      addAllPhoneNumbers(callerList, to: context)
-                      
-                  default:
-                      // Optionally handle any unexpected callerListType values
-                      NSLog("CallDirectoryHandler: unrecognized callerListType \(callerListType)")
-                }
+                  } else if (callerListType != "default") {
+                      addAllBlockedOrIdentificationPhoneNumbers(callerList, to: context)
+                  } else {
+                      addOrRemoveIncrementalPhoneNumbers(callerList, to: context)
+                  }
               } else {
                   addAllPhoneNumbers(callerList, to: context)
               }
@@ -66,78 +53,110 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
       
       context.completeRequest()
   }
-  
-  private func addIdentifyAndBlockEntries(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+
+  // vacation mode toggle -> remove all blocked/allowed and add all allowed/blocked afterwards
+  private func addAllBlockedOrIdentificationPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+      NSLog("addAllBlockedOrIdentificationPhoneNumbers")
+    if (callerListType == "allAllowed") {
+      NSLog("CallDirectoryHandler: remove all blocking entries")
+      context.removeAllBlockingEntries()
+    } else {
+      NSLog("CallDirectoryHandler: remove all identification entries")
+      context.removeAllIdentificationEntries()
+    }
+
+    addAllPhoneNumbers(list, to: context)
+  }
+
+
+  private func addOrRemoveIncrementalPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
     NSLog("addOrRemoveIncrementalPhoneNumbers")
     for item in list {
       if item.isBlocked {
+        if item.isRemoved {
+          NSLog("inc remove blocking entry: \(item.label) \(item.phoneNumber)")
+          context.removeBlockingEntry(withPhoneNumber: item.phoneNumber)
+        } else {
           NSLog("inc add blocking entry: \(item.label) \(item.phoneNumber)")
           context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
+        }
+      } else {
+        if item.isRemoved {
+          NSLog("inc remove identification entry: \(item.label) \(item.phoneNumber)")
+          context.removeIdentificationEntry(withPhoneNumber: item.phoneNumber)
+        } else {
+          NSLog("inc add identification entry: \(item.label) \(item.phoneNumber)")
+          context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
+        }
       }
-      NSLog("inc add identification entry: \(item.label) \(item.phoneNumber)")
-      context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
     }
   }
 
   // called when context is not incremental yet / empty
     private func addAllPhoneNumbers(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
         NSLog("addAllPhoneNumbers")
-        for item in list {
-            if item.isRemoved { continue }
-            context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
+        let batchSize = 5000 // Set a reasonable batch size
+        for batchStart in stride(from: 0, to: list.count, by: batchSize) {
+            let batch = list[batchStart..<min(batchStart + batchSize, list.count)]
+
+            for item in batch {
+                if item.isRemoved { continue }
+                if item.isBlocked {
+                    context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
+                } else {
+                    context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
+                }
+            }
+            
+            NSLog("Processed batch \(batchStart / batchSize + 1) of \(list.count / batchSize + 1)")
+            
+            // Check if time or memory limits are close and stop if necessary
         }
     }
 
-  private func parseCallerList(fromFileURL fileURL: URL) -> [CallerItem] {
-      NSLog("parseCallerList")
-      do {
-          // Use memory mapping to load the file data without loading the entire file into memory at once.
-          let jsonData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-          
-          // Deserialize the JSON data.
-          if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
-              
-              // Update the callerListType if available.
-              if let type = jsonObject["type"] as? String {
-                  callerListType = type
-              }
-              
-              // Process the items array.
-              if let items = jsonObject["items"] as? [[String: Any]] {
-                  return items.compactMap { dict in
-                      guard let label = dict["label"] as? String,
-                            let phoneNumber = dict["phonenumber"] as? Int64,
-                            let isRemoved = dict["isRemoved"] as? Bool,
-                            let isBlocked = dict["isBlocked"] as? Bool else {
-                          return nil
-                      }
-                      return CallerItem(label: label, phoneNumber: phoneNumber, isRemoved: isRemoved, isBlocked: isBlocked)
-                  }
-              } else {
-                  NSLog("Failed to cast JSON data to array")
-                  return []
-              }
-          } else {
-              NSLog("Failed to cast JSON data to object")
-              return []
+  private func parseCallerList(from jsonString: String) -> [CallerItem] {
+    NSLog("parseCallerList")
+    guard let jsonData = jsonString.data(using: .utf8) else {
+      NSLog("Failed to convert JSON string")
+
+      return []
+    }
+
+    do {
+      if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+
+        if let type = jsonObject["type"] as? String {
+          callerListType = type;
+        }
+
+        if let items = jsonObject["items"] as? [[String: Any]] {
+          return items.compactMap { dict in
+            guard let label = dict["label"] as? String,
+                  let phoneNumber = dict["phonenumber"] as? Int64,
+                  let isRemoved = dict["isRemoved"] as? Bool,
+                  let isBlocked = dict["isBlocked"] as? Bool else {
+              return nil
+            }
+            return CallerItem(label: label, phoneNumber: phoneNumber, isRemoved: isRemoved, isBlocked: isBlocked)
           }
-      } catch let error {
-          NSLog("Error deserializing JSON: \(error.localizedDescription)")
+        } else {
+          NSLog("Failed to cast JSON data to array")
           return []
+        }
+      } else {
+        NSLog("Failed to cast JSON data to object")
+        return []
       }
+    } catch let error {
+      NSLog("Error deserializing JSON: \(error.localizedDescription)")
+      return []
+    }
   }
-  
 }
 
 extension CallDirectoryHandler: CXCallDirectoryExtensionContextDelegate {
 
   func requestFailed(for extensionContext: CXCallDirectoryExtensionContext, withError error: Error) {
     NSLog("requestFailed: "+error.localizedDescription)
-    extensionContext.removeAllIdentificationEntries()
-    extensionContext.removeAllBlockingEntries()
-  }
-  
-  func requestDidComplete(for extensionContext: CXCallDirectoryExtensionContext) {
-    NSLog("requestDidComplete")
   }
 }

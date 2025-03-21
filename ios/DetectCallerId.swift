@@ -14,37 +14,22 @@ class DetectCallerId: NSObject {
         withResolver resolve: @escaping RCTPromiseResolveBlock,
         withRejecter reject:  @escaping RCTPromiseRejectBlock
     ) -> Void {
-        /* NSLog("setCallerList: Received options string: \(options)") */
-
-        // Attempt to convert the string to Data using UTF-8 encoding.
-        guard let data = options.data(using: .utf8) else {
-            NSLog("setCallerList: Failed to convert options string to Data using UTF-8")
-            reject("DATA_CONVERSION_ERROR", "Failed to convert options string to Data", nil)
-            return
-        }
-
-        /* do { */
-        /*     let jsonObject = try JSONSerialization.jsonObject(with: data, options: []) */
-        /*     NSLog("setCallerList: Successfully parsed JSON object: \(jsonObject)") */
-        /* } catch { */
-        /*     NSLog("setCallerList: Failed to parse JSON from options string: \(error)") */
-        /*     reject("JSON_PARSE_ERROR", "The options string is not valid JSON", error) */
-        /*     return */
-        /* } */
-
+        // Get the shared container URL using your group key.
         if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
+            // Choose a file name for your caller list.
             let fileURL = containerURL.appendingPathComponent("callerList.json")
-
+            
             do {
+                // Write the JSON string to the file.
                 try options.write(to: fileURL, atomically: true, encoding: .utf8)
-
+                
+                // Call your reload extension function after successfully writing the file.
                 reloadExtension(resolve, withRejecter: reject)
             } catch {
-                NSLog("setCallerList: Error writing file - \(error)")
+                // Reject the promise if file writing fails.
                 reject("FILE_WRITE_ERROR", "Unable to write caller list to file", error)
             }
         } else {
-            NSLog("setCallerList: Unable to access shared container with group \(groupKey)")
             reject("GROUP_ERROR", "Unable to access shared container for group \(groupKey)", nil)
         }
     }
@@ -52,42 +37,24 @@ class DetectCallerId: NSObject {
     @objc
     func clearCallerList(
         _ resolve: @escaping RCTPromiseResolveBlock,
-        withRejecter reject: @escaping RCTPromiseRejectBlock
-    ) -> Void {
-        let options = """
-        {
-            "type": "clearAll",
-            "items": []
-        }
-        """
-
-        // Validate that the options string is valid JSON.
-        guard let data = options.data(using: .utf8) else {
-            reject("DATA_CONVERSION_ERROR", "Failed to convert options string to Data", nil)
-            return
-        }
-
-        do {
-            _ = try JSONSerialization.jsonObject(with: data, options: [])
-        } catch {
-            reject("JSON_PARSE_ERROR", "The options string is not valid JSON", error)
-            return
-        }
-
-        // Write the JSON string to the shared container.
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupKey) {
-            let fileURL = containerURL.appendingPathComponent("callerList.json")
-
-            do {
-                try options.write(to: fileURL, atomically: true, encoding: .utf8)
-                reloadExtension(resolve, withRejecter: reject)
-            } catch {
-                reject("FILE_WRITE_ERROR", "Unable to write caller list to file", error)
+        withRejecter reject:  @escaping RCTPromiseRejectBlock) -> Void {
+            let options = """
+            {
+                "type": "clearAll",
+                "items": []
             }
-        } else {
-            reject("GROUP_ERROR", "Unable to access shared container for group \(groupKey)", nil)
-        }
+            """
+
+            NSLog("DetectCallerId: clearCallerList")
+
+            if let userDefaults = UserDefaults(suiteName: groupKey) {
+              userDefaults.set(options, forKey: dataKey)
+
+              // our CallDirectoryHandler will parse json stringified callerList
+              reloadExtension(resolve, withRejecter: reject);
+            }
     }
+
 
     @objc
     func checkPermissions(
@@ -192,7 +159,10 @@ class DetectCallerId: NSObject {
 
     private func clearStore() -> Void {
         NSLog("clearStore")
-        // TODO: Clean up JSON
+      if let userDefaults = UserDefaults(suiteName: groupKey) {
+          userDefaults.removeObject(forKey: dataKey)
+          NSLog("clean up temp store")
+      }
     }
 
     private func reloadFailed(
