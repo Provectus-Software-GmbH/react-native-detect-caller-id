@@ -20,6 +20,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
   private val context = reactContext
   private var contentProviderAvailable = false // true for default mode, false for compatibility mode
   private var workProfileAvailable = false // true for work profile mode (SyncToLocalContacts)
+  private val syncContactsManager = SyncContactsManager(context)
 
   // Declare CallManager with the current context
   private val callManager = CallManager(context)
@@ -67,7 +68,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       }
 
       try {
-        SyncContactsManager.syncContacts(options, isVacationModeActive, promise);
+        syncContactsManager.syncContacts(options, isVacationModeActive, promise);
         promise.resolve("synced to local contacts")
       } catch (e: JSONException) {
         e.printStackTrace()
