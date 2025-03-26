@@ -16,6 +16,8 @@ import android.provider.ContactsContract
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.google.gson.Gson
 import org.json.JSONArray
 import org.json.JSONException
@@ -27,6 +29,9 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     private val context = reactContext
     private var SCAGroupID: Long = -1L        // Global group ID. Set by getOrCreateContactGroupId.
     private var progressCallback: ((Int) -> Unit)? = null
+
+    // Declare the module name
+    override fun getName() = "SyncContactsManager"
 
     companion object {
         const val CONTACT_GROUP_NAME = "SCA"
@@ -40,7 +45,6 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
             val jsonObject = JSONObject(options)
             val items: JSONArray = jsonObject.getJSONArray("items")
             val type: String = jsonObject.getString("type")
-            // (You can use type as needed.)
 
             // Start the foreground service to prevent process death during long operations.
             val serviceIntent = Intent(context, SyncContactsForegroundService::class.java)
@@ -64,7 +68,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                         val protoContact = gson.fromJson(contactJson.toString(), IProtoContact::class.java)
                         // Transform into the target Contact model.
                         val contact = transform(protoContact, isVacationModeActive)
-                        // Use a unique key from your source (here, for example, using the guid).
+                        // Use a unique key from your source
                         contactsToInsert[protoContact.guid] = contact
                     }
 
@@ -110,7 +114,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                 .build()
             val results = contentResolver.applyBatch(ContactsContract.AUTHORITY, arrayListOf(op))
             // Retrieve the new group ID from the results
-            groupId = results[0].uri.lastPathSegment?.toLong() ?: -1L
+            groupId = results[0].uri?.lastPathSegment?.toLong() ?: -1L
         }
         return groupId
     }
