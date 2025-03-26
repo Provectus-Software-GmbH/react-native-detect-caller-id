@@ -77,6 +77,8 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
   @ReactMethod
   fun setCallerList(options: String, promise: Promise) {
+    Log.d("DetectCallerId", "setCallerList")
+
     if (workProfileAvailable) {
       promise.reject("DetectCallerId", "Setting up caller ids in work profile mode is not supported by this plugin")
     }
@@ -85,7 +87,6 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       val jsonObject = JSONObject(options)
       CallerManager.updateCallers(jsonObject.getJSONArray("items"), jsonObject.getString("type"))
 
-      //promise.resolve(convertJsonToMap(jsonObject))
       promise.resolve("caller list updated")
     } catch (e: JSONException) {
       e.printStackTrace()
@@ -100,7 +101,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
         promise.reject("DetectCallerId", "Removing caller ids in work profile mode is not supported by this plugin")
       }
 
-      CallerManager.clearAllCallerLists()
+      CallerManager.clearAllCallerList()
       promise.resolve("caller list cleared")
     }
 
