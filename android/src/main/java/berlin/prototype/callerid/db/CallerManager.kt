@@ -42,6 +42,13 @@ object CallerManager {
     Log.d("CallerManager", "get saved blocked callers: ${blockedCallers.size}")
   }
 
+  fun ensureContext(context: Context) {
+    if (appContext == null) {
+      appContext = context.applicationContext as? ReactApplicationContext
+        ?: throw IllegalStateException("Context is not a ReactApplicationContext")
+    }
+  }
+
   fun updateCallers(items: JSONArray, type: String) {
     Log.d("CallerManager", "updateCallers type: $type count: ${items.length()}")
     when (type) {
@@ -141,6 +148,11 @@ object CallerManager {
 
   private fun getSavedCallerList(filename: String): List<Caller> {
     Log.d("CallerManager", "getSavedCallerList filename: $filename")
+
+    if (appContext == null) {
+      Log.e("CallerManager", "appContext is null – did you forget to initialize?")
+      return emptyList()
+    }
 
     return try {
       val file = File(appContext?.filesDir, filename)
