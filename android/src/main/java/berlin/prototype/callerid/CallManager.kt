@@ -28,7 +28,8 @@ class CallManager(context: Context) {
         if (phoneNumber.isNullOrEmpty()) return false
 
         try {
-            val normalizedNumber = PhoneNumberUtils.normalizeNumber(phoneNumber)
+            val cleaned = phoneNumber.replace(Regex("^00"), "+")
+            val normalized = PhoneNumberUtils.formatNumberToE164(cleaned, "DE")
             val componentName = ComponentName(context, CustomConnectionService::class.java)
             val handle = PhoneAccountHandle(componentName, serviceID)
 
@@ -41,7 +42,7 @@ class CallManager(context: Context) {
             }
 
             val callInfo = Bundle().apply {
-                putString("from", normalizedNumber)
+                putString("from", normalized)
             }
 
             telecom.addNewIncomingCall(handle, callInfo)
