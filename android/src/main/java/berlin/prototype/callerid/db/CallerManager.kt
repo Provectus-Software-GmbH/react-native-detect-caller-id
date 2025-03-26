@@ -43,48 +43,67 @@ object CallerManager {
   }
 
   fun updateCallers(items: JSONArray, type: String) {
-    // handling vacation mode
-    // we know that all items are either blocked or allowed callers
-    // when having type allAllowed we want to clear all blocked callers
-    // when having type allBlocked we want to clear all allowed callers
-    if (type !== "default") {
-      var filename: String
-      var callers: MutableList<Caller>
-
-      if (type === "allAllowed") {
-        callers = blockedCallers
-        filename = BLOCKED_CALLERS_FILE
-      } else {
-        callers = allowedCallers
-        filename = ALLOWED_CALLERS_FILE
+    when (type) {
+      "clearAll" -> clearAllCallerLists()
+      "block" -> blockCallers(items)
+      "unblock" -> unblockCallers(items)
+      "identify" -> identifyCallers(items)
+      else -> {
+        // Optional: handle unknown type
+        throw IllegalArgumentException("Unknown type: $type")
       }
+    }
+  }
 
-      clearCallerList(callers, filename)
+  private fun identifyCallers(items: JSONArray) {
+    val currentAllowedCallers = allowedCallers.toSet()
+
+    for (i in 0 until items.length()) {
+      val item = items.getJSONObject(i)
+      val phoneNumber = item.getLong("phonenumber")
+      val isBlocked = item.getBoolean("isBlocked")
+
+      if (isBlocked) {
+        addCaller(phoneNumber.toString(), item.getString("label"), false)
+      }
     }
 
-    val currentAllowedCallers = allowedCallers.toSet()
+    if (currentAllowedCallers != allowedCallers) {
+      Log.d("CallerManager", "save identifyCallers  (" + allowedCallers.size + ")")
+      saveCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
+    }
+  }
+
+  private fun blockCallers(items: JSONArray) {
     val currentBlockedCallers = blockedCallers.toSet()
 
     for (i in 0 until items.length()) {
       val item = items.getJSONObject(i)
       val phoneNumber = item.getLong("phonenumber")
       val isBlocked = item.getBoolean("isBlocked")
-      val isRemoved = item.getBoolean("isRemoved")
 
-      if (isRemoved) {
-        removeCaller(phoneNumber.toString(), isBlocked)
-      } else {
-        addCaller(phoneNumber.toString(), item.getString("label"), isBlocked)
+      if (isBlocked) {
+        addCaller(phoneNumber.toString(), item.getString("label"), true)
       }
     }
 
-    if (currentAllowedCallers != allowedCallers) {
-      Log.d("CallerManager", "save allowed callers (" + allowedCallers.size + ")")
-      saveCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
+    if (currentBlockedCallers != blockedCallers) {
+      Log.d("CallerManager", "save blockCallers (" + blockedCallers.size + ")")
+      saveCallerList(blockedCallers, BLOCKED_CALLERS_FILE)
+    }
+  }
+
+  private fun unblockCallers(items: JSONArray) {
+    val currentBlockedCallers = blockedCallers.toSet()
+
+    for (i in 0 until items.length()) {
+      val item = items.getJSONObject(i)
+      val phoneNumber = item.getLong("phonenumber")
+      removeCaller(phoneNumber.toString(), true)
     }
 
     if (currentBlockedCallers != blockedCallers) {
-      Log.d("CallerManager", "save blocked callers (" + blockedCallers.size + ")")
+      Log.d("CallerManager", "save unblockCallers (" + blockedCallers.size + ")")
       saveCallerList(blockedCallers, BLOCKED_CALLERS_FILE)
     }
   }
