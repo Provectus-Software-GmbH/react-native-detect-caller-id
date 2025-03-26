@@ -1,5 +1,6 @@
 package berlin.prototype.callerid.db
 
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -42,9 +43,17 @@ object CallerManager {
     Log.d("CallerManager", "get saved blocked callers: ${blockedCallers.size}")
   }
 
+  fun ensureContext(context: Context) {
+    if (appContext == null) {
+      appContext = context.applicationContext as? ReactApplicationContext
+        ?: throw IllegalStateException("Context is not a ReactApplicationContext")
+    }
+  }
+
   fun updateCallers(items: JSONArray, type: String) {
+    Log.d("CallerManager", "updateCallers type: $type count: ${items.length()}")
     when (type) {
-      "clearAll" -> clearAllCallerLists()
+      "clearAll" -> clearAllCallerList()
       "block" -> blockCallers(items)
       "unblock" -> unblockCallers(items)
       "identify" -> identifyCallers(items)
@@ -56,18 +65,20 @@ object CallerManager {
   }
 
   private fun identifyCallers(items: JSONArray) {
+    Log.d("CallerManager", "identifyCallers count: ${items.length()}")
+
     val currentAllowedCallers = allowedCallers.toSet()
 
     for (i in 0 until items.length()) {
       val item = items.getJSONObject(i)
       val phoneNumber = item.getLong("phonenumber")
-      val isBlocked = item.getBoolean("isBlocked")
+      val label = item.getString("label")
 
-      if (isBlocked) {
-        addCaller(phoneNumber.toString(), item.getString("label"), false)
-      }
+      Log.d("CallerManager", "identifyCallers phoneNumber: $phoneNumber label: ${label}")
+      allowedCallers.add(Caller(phoneNumber.toString(), label))
     }
 
+    Log.d("CallerManager", "allowedCallers count: ${allowedCallers.size} currentAllowedCallers: ${currentAllowedCallers.size}")
     if (currentAllowedCallers != allowedCallers) {
       Log.d("CallerManager", "save identifyCallers  (" + allowedCallers.size + ")")
       saveCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
@@ -75,6 +86,7 @@ object CallerManager {
   }
 
   private fun blockCallers(items: JSONArray) {
+    Log.d("CallerManager", "blockCallers count: ${items.length()}")
     val currentBlockedCallers = blockedCallers.toSet()
 
     for (i in 0 until items.length()) {
@@ -83,7 +95,11 @@ object CallerManager {
       val isBlocked = item.getBoolean("isBlocked")
 
       if (isBlocked) {
-        addCaller(phoneNumber.toString(), item.getString("label"), true)
+        blockedCallers.add(Caller(phoneNumber.toString(), item.getString("label")))
+        Log.d("CallerManager", "blocked: ${phoneNumber}")
+
+      } else {
+        Log.d("CallerManager", "did not block: ${phoneNumber}")
       }
     }
 
@@ -94,12 +110,13 @@ object CallerManager {
   }
 
   private fun unblockCallers(items: JSONArray) {
+    Log.d("CallerManager", "unblockCallers count: ${items.length()}")
     val currentBlockedCallers = blockedCallers.toSet()
 
     for (i in 0 until items.length()) {
       val item = items.getJSONObject(i)
       val phoneNumber = item.getLong("phonenumber")
-      removeCaller(phoneNumber.toString(), true)
+      blockedCallers.removeIf { it.phoneNumber == phoneNumber.toString() }
     }
 
     if (currentBlockedCallers != blockedCallers) {
@@ -108,7 +125,8 @@ object CallerManager {
     }
   }
 
-  fun clearAllCallerLists() {
+  fun clearAllCallerList() {
+    Log.d("CallerManager", "clearAllCallerList")
     Log.d("CallerManager", "clear allowed callers (" + allowedCallers.size + ")")
     Log.d("CallerManager", "clear blocked callers (" + blockedCallers.size + ")")
     clearCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
@@ -128,18 +146,15 @@ object CallerManager {
     return blockedCallers.any { it.phoneNumber == phoneNumber }
   }
 
-  private fun addCaller(phoneNumber: String, label: String, isBlocked: Boolean) {
-    val callers = if (isBlocked) blockedCallers else allowedCallers
-
-    callers.add(Caller(phoneNumber, label))
-  }
-
-  private fun removeCaller(phoneNumber: String, isBlocked: Boolean) {
-    val callers = if (isBlocked) blockedCallers else allowedCallers
-    callers.removeIf { it.phoneNumber == phoneNumber }
-  }
 
   private fun getSavedCallerList(filename: String): List<Caller> {
+    Log.d("CallerManager", "getSavedCallerList filename: $filename")
+
+    if (appContext == null) {
+      Log.e("CallerManager", "appContext is null – did you forget to initialize?")
+      return emptyList()
+    }
+
     return try {
       val file = File(appContext?.filesDir, filename)
       if (!file.exists()) {
@@ -168,6 +183,7 @@ object CallerManager {
   }
 
   private fun saveCallerList(callers: MutableList<Caller>, filename: String) {
+    Log.d("CallerManager", "getSavedCallerList filename: $filename callers: ${callers.size}")
     if (callers.isEmpty()) {
       return clearCallerList(callers, filename)
     }
@@ -190,6 +206,7 @@ object CallerManager {
 
   // New function to delete the file
   private fun clearCallerList(callers: MutableList<Caller>, filename: String) {
+    Log.d("CallerManager", "clearCallerList filename: $filename callers: ${callers.size}")
     callers.clear()
 
     val context = appContext ?: return

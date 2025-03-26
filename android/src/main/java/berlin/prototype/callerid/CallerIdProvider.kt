@@ -56,6 +56,7 @@ class CallerIdProvider : ContentProvider() {
       }
 
       PHONE_LOOKUP -> {
+        CallerManager.ensureContext(context ?: return null)
         val normalizedPhoneNumber = CallerManager.getNormalizedPhoneNumber(uri.lastPathSegment)
         Log.d("CallerIdProvider", "look up caller with phone number: $normalizedPhoneNumber")
 
