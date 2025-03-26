@@ -24,25 +24,32 @@ class CallManager(context: Context) {
 
     // Method to simulate an incoming call
     fun simulateIncomingCall(phoneNumber: String?): Boolean {
-        // Guard
         if (phoneNumber.isNullOrEmpty()) return false
-        // Create a bundle to store the call information > from phone number
-        val callInfo = Bundle().apply {
-            putString("from", phoneNumber)
-        }
+
         try {
+            val normalizedNumber = PhoneNumberUtils.normalizeNumber(phoneNumber)
             val componentName = ComponentName(context, CustomConnectionService::class.java)
-            phoneAccountHandle = PhoneAccountHandle(componentName, serviceID)
-            if (checkAccountConnection()) {
-                // Add new incoming call to the TelecomManager
-                telecomManager?.addNewIncomingCall(phoneAccountHandle, callInfo)
-                // Display a toast message
-                Toast.makeText(context, "please wait, call incoming...", Toast.LENGTH_LONG).show()
-                return true
+            val handle = PhoneAccountHandle(componentName, serviceID)
+
+            val telecom = telecomManager ?: return false
+
+            val accounts = telecom.callCapablePhoneAccounts
+            if (!accounts.contains(handle)) {
+                Log.w("CallManager", "PhoneAccountHandle is not registered or enabled.")
+                return false
             }
+
+            val callInfo = Bundle().apply {
+                putString("from", normalizedNumber)
+            }
+
+            telecom.addNewIncomingCall(handle, callInfo)
+            Toast.makeText(context, "Please wait, call incoming...", Toast.LENGTH_LONG).show()
+            return true
         } catch (ex: Exception) {
-            Log.e("CallManager", ex.message ?: "Unknown error")
+            Log.e("CallManager", "simulateIncomingCall failed: ${ex.message}", ex)
         }
+
         return false
     }
 
