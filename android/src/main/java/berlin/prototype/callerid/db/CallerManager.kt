@@ -64,13 +64,13 @@ object CallerManager {
     for (i in 0 until items.length()) {
       val item = items.getJSONObject(i)
       val phoneNumber = item.getLong("phonenumber")
-      val isBlocked = item.getBoolean("isBlocked")
+      val label = item.getString("label")
 
-      if (isBlocked) {
-        addCaller(phoneNumber.toString(), item.getString("label"), false)
-      }
+      Log.d("CallerManager", "identifyCallers phoneNumber: $phoneNumber label: ${label}")
+      allowedCallers.add(Caller(phoneNumber.toString(), label))
     }
 
+    Log.d("CallerManager", "allowedCallers count: ${allowedCallers.size} currentAllowedCallers: ${currentAllowedCallers.size}")
     if (currentAllowedCallers != allowedCallers) {
       Log.d("CallerManager", "save identifyCallers  (" + allowedCallers.size + ")")
       saveCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
@@ -87,7 +87,11 @@ object CallerManager {
       val isBlocked = item.getBoolean("isBlocked")
 
       if (isBlocked) {
-        addCaller(phoneNumber.toString(), item.getString("label"), true)
+        blockedCallers.add(Caller(phoneNumber.toString(), item.getString("label")))
+        Log.d("CallerManager", "blocked: ${phoneNumber}")
+
+      } else {
+        Log.d("CallerManager", "did not block: ${phoneNumber}")
       }
     }
 
@@ -104,7 +108,7 @@ object CallerManager {
     for (i in 0 until items.length()) {
       val item = items.getJSONObject(i)
       val phoneNumber = item.getLong("phonenumber")
-      removeCaller(phoneNumber.toString(), true)
+      blockedCallers.removeIf { it.phoneNumber == phoneNumber.toString() }
     }
 
     if (currentBlockedCallers != blockedCallers) {
@@ -134,18 +138,6 @@ object CallerManager {
     return blockedCallers.any { it.phoneNumber == phoneNumber }
   }
 
-  private fun addCaller(phoneNumber: String, label: String, isBlocked: Boolean) {
-    Log.d("CallerManager", "addCaller phoneNumber: $phoneNumber label: $label isBlocked: $isBlocked")
-    val callers = if (isBlocked) blockedCallers else allowedCallers
-
-    callers.add(Caller(phoneNumber, label))
-  }
-
-  private fun removeCaller(phoneNumber: String, isBlocked: Boolean) {
-    Log.d("CallerManager", "addCaller phoneNumber: $phoneNumber isBlocked: $isBlocked")
-    val callers = if (isBlocked) blockedCallers else allowedCallers
-    callers.removeIf { it.phoneNumber == phoneNumber }
-  }
 
   private fun getSavedCallerList(filename: String): List<Caller> {
     Log.d("CallerManager", "getSavedCallerList filename: $filename")
@@ -201,6 +193,7 @@ object CallerManager {
 
   // New function to delete the file
   private fun clearCallerList(callers: MutableList<Caller>, filename: String) {
+    Log.d("CallerManager", "clearCallerList filename: $filename callers: ${callers.size}")
     callers.clear()
 
     val context = appContext ?: return
