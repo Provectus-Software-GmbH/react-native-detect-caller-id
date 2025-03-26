@@ -64,15 +64,14 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     fun syncContacts(options: String, isVacationModeActive: Boolean, promise: Promise) {
       if (!workProfileAvailable) {
         promise.reject("DetectCallerId", "Syncing contacts while not in work profile mode is not supported by this plugin")
+        return
       }
 
       try {
-        SyncContactsManager.syncContacts(options, isVacationModeActive, promise);
-        promise.resolve("synced to local contacts")
+        val manager = SyncContactsManager(context)
+        manager.syncContacts(options, isVacationModeActive, promise)
       } catch (e: JSONException) {
         e.printStackTrace()
-        // Reject the promise with an error message
-        promise.reject("SYNC_ERROR", "Failed to sync contacts", e)
       }
     }
 
