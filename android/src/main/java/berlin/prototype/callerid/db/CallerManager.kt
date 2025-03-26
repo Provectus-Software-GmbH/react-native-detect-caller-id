@@ -1,5 +1,6 @@
 package berlin.prototype.callerid.db
 
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
