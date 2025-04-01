@@ -1,11 +1,16 @@
 import Foundation
 import CallKit
 
-struct CallerItem {
+struct CallerItem: CustomStringConvertible {
   let label: String
   let phoneNumber: Int64
   let isRemoved: Bool
   let isBlocked: Bool
+  
+  
+  var description: String {
+      return "Caller(label: \(label), phoneNumber: \(phoneNumber))"
+  }
 }
 
 class CallDirectoryHandler: CXCallDirectoryProvider {
@@ -16,6 +21,9 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   // default, allAllowed, allBlocked, clearAll
   // allAllowed or allBlocked is set when vacation mode has been toggled
   var callerListType: String = "default";
+  
+  var blockItems: [CallerItem] = []
+  var identifyItems: [CallerItem] = []
 
   override func beginRequest(with context: CXCallDirectoryExtensionContext) {
       context.delegate = self
@@ -32,12 +40,15 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
             // Log the total count of callerList entries.
             NSLog("CallDirectoryHandler: Total callerList count: \(callerList.count)")
             NSLog("CallDirectoryHandler: callerListType: \(callerListType)")
+            NSLog("CallDirectoryHandler: isIncremental: \(context.isIncremental)")
 
             // type block, unblock, identify, default, clearAll
 
             switch callerListType {
               case "clearAll":
                   NSLog("CallDirectoryHandler: remove all blocking and identification entries")
+                  blockItems = []
+                  identifyItems = []
                   context.removeAllIdentificationEntries()
                   context.removeAllBlockingEntries()
 
@@ -69,7 +80,14 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   }
 
   private func block(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
-    NSLog("[CallDirectoryHandler] block")
+    NSLog("[CallDirectoryHandler] block: isIncremental: \(context.isIncremental)")
+    
+    if (context.isIncremental) {
+      blockItems += list
+    } else {
+      blockItems = list
+    }
+    
     for item in list {
         NSLog("add blocking entry: \(item.label) \(item.phoneNumber)")
         context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
@@ -81,17 +99,29 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
     for item in list {
       NSLog("remove blocking entry: \(item.label) \(item.phoneNumber)")
       context.removeBlockingEntry(withPhoneNumber: item.phoneNumber)
+      blockItems.removeAll { blockedItem in
+        return item.phoneNumber == blockedItem.phoneNumber
+      }
     }
   }
 
   // called when context is not incremental yet / empty
-    private func identify(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
-      NSLog("[CallDirectoryHandler] identify")
-      for item in list {
-          if item.isRemoved { continue }
-          context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
-      }
+  private func identify(_ list: [CallerItem], to context: CXCallDirectoryExtensionContext) {
+    NSLog("[CallDirectoryHandler] identify: isIncremental: \(context.isIncremental)")
+    
+    if (context.isIncremental) {
+      identifyItems += list
+    } else {
+      identifyItems = list
     }
+    
+    for item in identifyItems {
+      if item.isRemoved { continue }
+    
+      NSLog("identify: \(item.label) \(item.phoneNumber)")
+      context.addIdentificationEntry(withNextSequentialPhoneNumber: item.phoneNumber, label: item.label)
+    }
+  }
 
   private func parseCallerList(fromFileURL fileURL: URL) -> [CallerItem] {
       NSLog("parseCallerList")
