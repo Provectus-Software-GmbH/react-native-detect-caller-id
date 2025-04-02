@@ -22,6 +22,7 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
   // allAllowed or allBlocked is set when vacation mode has been toggled
   var callerListType: String = "default";
   
+  // We need this to keep all items regardless of current request chunk size
   var blockItems: [CallerItem] = []
   var identifyItems: [CallerItem] = []
 
@@ -83,12 +84,19 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
     NSLog("[CallDirectoryHandler] block: isIncremental: \(context.isIncremental)")
     
     if (context.isIncremental) {
-      blockItems += list
+      var seen = Set(blockItems.map { $0.phoneNumber })
+
+      for item in list {
+          if !seen.contains(item.phoneNumber) {
+            blockItems.append(item)
+            seen.insert(item.phoneNumber)
+          }
+      }
     } else {
       blockItems = list
     }
     
-    for item in list {
+    for item in blockItems {
         NSLog("add blocking entry: \(item.label) \(item.phoneNumber)")
         context.addBlockingEntry(withNextSequentialPhoneNumber: item.phoneNumber)
     }
@@ -110,7 +118,14 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
     NSLog("[CallDirectoryHandler] identify: isIncremental: \(context.isIncremental)")
     
     if (context.isIncremental) {
-      identifyItems += list
+      var seen = Set(identifyItems.map { $0.phoneNumber })
+
+      for item in list {
+          if !seen.contains(item.phoneNumber) {
+              identifyItems.append(item)
+              seen.insert(item.phoneNumber)
+          }
+      }
     } else {
       identifyItems = list
     }
