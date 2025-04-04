@@ -25,7 +25,7 @@ class CallDetectScreeningService : CallScreeningService() {
       val normalizedNumber = CallerManager.getNormalizedPhoneNumber(phoneNumber)
 
       if (CallerManager.isPhoneNumberBlocked(normalizedNumber)) {
-        Log.d("CallDetectScreeningService", "$phoneNumber is blocked")
+        Log.d("CallDetectScreeningService", "onScreenCall: $phoneNumber is blocked")
 
         val response = CallResponse.Builder()
           .setDisallowCall(true)
@@ -38,6 +38,7 @@ class CallDetectScreeningService : CallScreeningService() {
         return
       }
 
+      Log.d("CallDetectScreeningService", "onScreenCall: $phoneNumber is not blocked")
       val response = CallResponse.Builder()
         .setDisallowCall(false)
         .setRejectCall(false)

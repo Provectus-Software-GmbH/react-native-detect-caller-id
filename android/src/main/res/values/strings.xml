@@ -1,3 +1,4 @@
 <resources>
     <string name="default_caller_name">Unknown caller</string>
+    <string name="caller_id_label">SecContacts CallerID</string>
 </resources>
