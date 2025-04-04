@@ -73,13 +73,13 @@ class CallerForegroundService : Service() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "Caller ID Service", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(channelId, "Caller ID Service", NotificationManager.IMPORTANCE_DEFAULT)
             notificationManager.createNotificationChannel(channel)
         }
 
         val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Caller ID Running")
-            .setContentText("Detecting incoming calls")
+            .setContentTitle("Secure Contacts")
+            .setContentText("Caller ID")
             .setSmallIcon(android.R.drawable.sym_call_missed) // Replace with your app icon
             .build()
 

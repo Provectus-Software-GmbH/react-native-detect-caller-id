@@ -263,7 +263,7 @@ class CustomOverlayManager : BroadcastReceiver() {
                 dismissCallerInfo(context)
             }
         }
-        
+
         fun dismissCallerInfo(context: Context) {
             if (overlay != null) {
                 val windowManager: WindowManager =
