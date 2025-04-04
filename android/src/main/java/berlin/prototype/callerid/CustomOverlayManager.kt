@@ -31,42 +31,39 @@ import berlin.prototype.callerid.db.CallerManager
 class CustomOverlayManager : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("CustomOverlayManager", "onReceive")
+
         if (
             CallerManager.contentProviderAvailable ||
             CallerManager.workProfileAvailable ||
-            !Settings.canDrawOverlays(context)) {
-            return
-        }
+            !Settings.canDrawOverlays(context)
+        ) return
 
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
-
         Log.d("CustomOverlayManager", "onReceive: state $state")
-        if (state == TelephonyManager.EXTRA_STATE_RINGING) {
-            if (!isShowingOverlay) {
-                Log.d("CustomOverlayManager", "onReceive: show overlay")
 
-                val phoneNumber = callServiceNumber ?: return
-                val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
-
-                isShowingOverlay = true
-
-                val parts = caller.label.split(",", limit = 2)
-                val callerName = parts[0].trim()
-                val callerInfo = if (parts.size > 1) parts[1].trim() else ""
-                showCallerInfo(context, callerName, callerInfo)
-            }
-        } else if (state == TelephonyManager.EXTRA_STATE_OFFHOOK || state == TelephonyManager.EXTRA_STATE_IDLE) {
-            if (isShowingOverlay) {
-                // Create Samsung notification
-                createNotification(context)
-
-                Log.d("CustomOverlayManager", "onReceive: hide overlay")
-                isShowingOverlay = false
-                callServiceNumber = null
-                dismissCallerInfo(context)
-            }
-
+        when (state) {
+            TelephonyManager.EXTRA_STATE_RINGING -> handleIncomingCall(context)
+            TelephonyManager.EXTRA_STATE_OFFHOOK,
+            TelephonyManager.EXTRA_STATE_IDLE -> handleCallEnded(context)
         }
+    }
+
+    private fun handleIncomingCall(context: Context) {
+        if (isShowingOverlay) return
+
+        val phoneNumber = callServiceNumber ?: return
+        val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
+
+        callServiceNumber = phoneNumber
+        showOverlay(context, caller.label)
+    }
+
+    private fun handleCallEnded(context: Context) {
+        if (!isShowingOverlay) return
+
+        createNotification(context) // optional
+        dismissOverlay(context)
+        callServiceNumber = null
     }
 
     private fun createNotification(context: Context): Boolean {
@@ -125,7 +122,7 @@ class CustomOverlayManager : BroadcastReceiver() {
         return layout
     }
 
-    private fun showCallerInfo(
+    internal fun showCallerInfo(
         context: Context,
         callerName: String,
         callerInfo: String,
@@ -233,42 +230,49 @@ class CustomOverlayManager : BroadcastReceiver() {
         }
     }
 
-    private fun dismissCallerInfo(context: Context) {
-        if (overlay != null) {
-            val windowManager: WindowManager =
-                context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            windowManager.removeView(overlay)
-            overlay = null
-        }
-    }
-
-    fun showLocalNotification(context: Context, title: String, content: String) {
-        Log.d("CustomOverlayManager", "showLocalNotification")
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "missed_call_channel"
-
-        // For Android Oreo and above, create a notification channel.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelName = "Missed Call Notifications"
-            val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT)
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)  // Use your own icon here
-            .setContentTitle(title)
-            .setContentText(content)
-            .setAutoCancel(true)
-            .build()
-
-        Log.d("CustomOverlayManager", "showLocalNotification: executing notificationManager notify")
-        notificationManager.notify(1001, notification)
-    }
-
     companion object {
         private var isShowingOverlay = false
         private var overlay: LinearLayout? = null
         var callServiceNumber: String? = null
+
+        fun showOverlay(context: Context, callerLabel: String) {
+            if (!Settings.canDrawOverlays(context)) {
+                Log.w("CustomOverlayManager", "Missing overlay permission")
+                return
+            }
+
+            if (isShowingOverlay) {
+                Log.d("CustomOverlayManager", "Overlay already showing")
+                return
+            }
+
+            val parts = callerLabel.split(",", limit = 2)
+            val callerName = parts[0].trim()
+            val callerInfo = if (parts.size > 1) parts[1].trim() else ""
+
+            isShowingOverlay = true
+
+            val manager = CustomOverlayManager()
+            manager.showCallerInfo(context, callerName, callerInfo)
+        }
+
+        fun dismissOverlay(context: Context) {
+            if (isShowingOverlay) {
+                Log.d("CustomOverlayManager", "Dismissing overlay")
+                isShowingOverlay = false
+                dismissCallerInfo(context)
+            }
+        }
+        
+        fun dismissCallerInfo(context: Context) {
+            if (overlay != null) {
+                val windowManager: WindowManager =
+                    context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                windowManager.removeView(overlay)
+                overlay = null
+            }
+        }
+
         private fun getApplicationName(context: Context): String {
             val applicationInfo = context.applicationInfo
             val stringId = applicationInfo.labelRes

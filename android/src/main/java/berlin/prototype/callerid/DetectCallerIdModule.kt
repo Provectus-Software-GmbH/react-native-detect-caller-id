@@ -2,6 +2,7 @@ package berlin.prototype.callerid
 
 import android.app.admin.DevicePolicyManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.telecom.TelecomManager
 import android.util.Log
@@ -33,8 +34,17 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       contentProviderAvailable = hasGenuineAndroidDefaultDialer()
       workProfileAvailable = isInstalledOnWorkProfile()
 
-      // CallerManager also stores flags for contentProvider and workProfile mode
       CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
+
+      // Only start foreground service if we're in Samsung compatibility mode
+      if (!contentProviderAvailable && !workProfileAvailable) {
+        val serviceIntent = Intent(context, CallerForegroundService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(serviceIntent)
+        } else {
+          context.startService(serviceIntent)
+        }
+      }
     }
 
     @ReactMethod
