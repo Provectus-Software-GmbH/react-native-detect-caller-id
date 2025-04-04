@@ -76,12 +76,6 @@ class CustomOverlayManager : BroadcastReceiver() {
         val parts = caller.label.split(",", limit = 2)
         val callerName = parts[0].trim()
 
-        // Build intent with phone number
-//    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-//      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-//      putExtra("phone_number", phoneNumber)
-//    } ?: return true
-
         val intent = Intent(context, Class.forName("de.provectus.securecontacts.droid.MainActivity")).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
             putExtra("phone_number", phoneNumber)
@@ -105,7 +99,7 @@ class CustomOverlayManager : BroadcastReceiver() {
         }
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Replace with your app icon
+            .setSmallIcon(android.R.drawable.sym_call_missed) // Replace with your app icon
             .setContentTitle(callerName)
             .setContentText("Missed call")
             .setContentIntent(pendingIntent)
