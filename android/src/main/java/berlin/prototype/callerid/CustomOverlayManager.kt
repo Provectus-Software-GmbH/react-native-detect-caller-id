@@ -31,9 +31,9 @@ class CustomOverlayManager : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("CustomOverlayManager", "onReceive")
         if (
-          CallerManager.contentProviderAvailable ||
-          CallerManager.workProfileAvailable ||
-          !Settings.canDrawOverlays(context)) {
+            CallerManager.contentProviderAvailable ||
+            CallerManager.workProfileAvailable ||
+            !Settings.canDrawOverlays(context)) {
             return
         }
 
@@ -44,22 +44,18 @@ class CustomOverlayManager : BroadcastReceiver() {
             if (!isShowingOverlay) {
                 Log.d("CustomOverlayManager", "onReceive: show overlay")
 
-              val phoneNumber = callServiceNumber ?: return
-              val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
+                val phoneNumber = callServiceNumber ?: return
+                val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
 
-              isShowingOverlay = true
+                isShowingOverlay = true
 
-              val parts = caller.label.split(",", limit = 2)
-              val callerName = parts[0].trim()
-              val callerInfo = if (parts.size > 1) parts[1].trim() else ""
-              showCallerInfo(context, callerName, callerInfo)
+                val parts = caller.label.split(",", limit = 2)
+                val callerName = parts[0].trim()
+                val callerInfo = if (parts.size > 1) parts[1].trim() else ""
+                showCallerInfo(context, callerName, callerInfo)
             }
         } else if (state == TelephonyManager.EXTRA_STATE_OFFHOOK || state == TelephonyManager.EXTRA_STATE_IDLE) {
             if (isShowingOverlay) {
-                Log.d("CustomOverlayManager", "onReceive: hide overlay")
-                isShowingOverlay = false
-                callServiceNumber = null
-                dismissCallerInfo(context)
                 // Create Samsung notification
                 Log.d("CustomOverlayManager", "create samsung notification")
                 val phoneNumber = callServiceNumber ?: return
@@ -71,6 +67,11 @@ class CustomOverlayManager : BroadcastReceiver() {
                     title = "${callerName}",
                     content = "Missed call",
                 )
+
+                Log.d("CustomOverlayManager", "onReceive: hide overlay")
+                isShowingOverlay = false
+                callServiceNumber = null
+                dismissCallerInfo(context)
             }
 
         }
@@ -99,38 +100,38 @@ class CustomOverlayManager : BroadcastReceiver() {
         val layout = this.getLayoutTemplate(context)
 
         Handler(Looper.getMainLooper()).postDelayed({
-          val windowManager: WindowManager =
-            context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-          if (overlay == null) {
-            val inflater: LayoutInflater = LayoutInflater.from(context)
-            overlay = inflater.inflate(layout, null) as LinearLayout
+            val windowManager: WindowManager =
+                context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            if (overlay == null) {
+                val inflater: LayoutInflater = LayoutInflater.from(context)
+                overlay = inflater.inflate(layout, null) as LinearLayout
 
-            fillLayout(context, appName, callerName, callerInfo)
-          }
+                fillLayout(context, appName, callerName, callerInfo)
+            }
 
-          val typeParam: Int = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            val typeParam: Int = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
-          val params: WindowManager.LayoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            typeParam,
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-          )
+            val params: WindowManager.LayoutParams = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                typeParam,
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+            )
 
-          // TODO: replace deprecated FLAG_SHOW_WHEN_LOCKED with keyguardManager
-          // this would require starting an activity which we currently haven't implemented
-          // something like this:
-          // val overlayIntent = Intent(context, OverlayActivity::class.java)
-          // overlayIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-          // context?.startActivity(overlayIntent)
-          //
-          // OverlayActivity: Activity() {
-          //  val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-          //  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-          //    keyguardManager.requestDismissKeyguard(this, null)
-          //  }
-          windowManager.addView(overlay, params)
+            // TODO: replace deprecated FLAG_SHOW_WHEN_LOCKED with keyguardManager
+            // this would require starting an activity which we currently haven't implemented
+            // something like this:
+            // val overlayIntent = Intent(context, OverlayActivity::class.java)
+            // overlayIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // context?.startActivity(overlayIntent)
+            //
+            // OverlayActivity: Activity() {
+            //  val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            //  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            //    keyguardManager.requestDismissKeyguard(this, null)
+            //  }
+            windowManager.addView(overlay, params)
         }, 1000)
     }
 
@@ -177,9 +178,9 @@ class CustomOverlayManager : BroadcastReceiver() {
             val textViewCallerInfo: TextView =
                 overlay!!.findViewById<TextView>(R.id.callerInfo)
             if (callerInfo != null && callerInfo.length > 0) {
-              textViewCallerInfo.text = callerInfo
+                textViewCallerInfo.text = callerInfo
             } else {
-              textViewCallerInfo.text = ""
+                textViewCallerInfo.text = ""
             }
         } catch (error: Exception) {
         }
@@ -202,8 +203,8 @@ class CustomOverlayManager : BroadcastReceiver() {
         if (overlay != null) {
             val windowManager: WindowManager =
                 context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-          windowManager.removeView(overlay)
-          overlay = null
+            windowManager.removeView(overlay)
+            overlay = null
         }
     }
 
