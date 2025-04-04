@@ -29,6 +29,7 @@ import berlin.prototype.callerid.db.CallerManager
 @RequiresApi(Build.VERSION_CODES.N)
 class CustomOverlayManager : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d("CustomOverlayManager", "onReceive")
         if (
           CallerManager.contentProviderAvailable ||
           CallerManager.workProfileAvailable ||
@@ -37,8 +38,11 @@ class CustomOverlayManager : BroadcastReceiver() {
         }
 
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
+
+        Log.d("CustomOverlayManager", "onReceive: state $state")
         if (state == TelephonyManager.EXTRA_STATE_RINGING) {
             if (!isShowingOverlay) {
+                Log.d("CustomOverlayManager", "onReceive: show overlay")
 
               val phoneNumber = callServiceNumber ?: return
               val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
@@ -51,23 +55,24 @@ class CustomOverlayManager : BroadcastReceiver() {
               showCallerInfo(context, callerName, callerInfo)
             }
         } else if (state == TelephonyManager.EXTRA_STATE_OFFHOOK || state == TelephonyManager.EXTRA_STATE_IDLE) {
-            Log.d("CustomOverlayManager", "hide overlay")
             if (isShowingOverlay) {
+                Log.d("CustomOverlayManager", "onReceive: hide overlay")
                 isShowingOverlay = false
                 callServiceNumber = null
                 dismissCallerInfo(context)
+                // Create Samsung notification
+                Log.d("CustomOverlayManager", "create samsung notification")
+                val phoneNumber = callServiceNumber ?: return
+                val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
+                val parts = caller.label.split(",", limit = 2)
+                val callerName = parts[0].trim()
+                showLocalNotification(
+                    context = context,
+                    title = "${callerName}",
+                    content = "Missed call",
+                )
             }
 
-            // Create Samsung notification
-            val phoneNumber = callServiceNumber ?: return
-            val caller = CallerManager.getCallerByNumber(phoneNumber) ?: return
-            val parts = caller.label.split(",", limit = 2)
-            val callerName = parts[0].trim()
-            showLocalNotification(
-                context = context,
-                title = "${callerName}",
-                content = "Missed call",
-            )
         }
     }
 
@@ -203,6 +208,7 @@ class CustomOverlayManager : BroadcastReceiver() {
     }
 
     fun showLocalNotification(context: Context, title: String, content: String) {
+        Log.d("CustomOverlayManager", "showLocalNotification")
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "missed_call_channel"
 
@@ -220,7 +226,7 @@ class CustomOverlayManager : BroadcastReceiver() {
             .setAutoCancel(true)
             .build()
 
-        // Use a constant or generate a unique ID for each notification.
+        Log.d("CustomOverlayManager", "showLocalNotification: executing notificationManager notify")
         notificationManager.notify(1001, notification)
     }
 

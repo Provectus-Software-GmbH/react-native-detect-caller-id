@@ -31,7 +31,7 @@ object CallerManager {
     contentProviderAvailable = contentProvider
     workProfileAvailable = workProfile
 
-    // allowed and blocked callers are handled by system contacts app / expo-contacts plugin
+    // allowed and blocked callers are handled by system contacts app
     if (workProfileAvailable) {
       return
     }
@@ -40,7 +40,6 @@ object CallerManager {
     blockedCallers.addAll(getSavedCallerList(BLOCKED_CALLERS_FILE))
 
     Log.d("CallerManager", "get saved allowed callers: ${allowedCallers.size}")
-    Log.d("CallerManager", "get saved blocked callers: ${blockedCallers.size}")
   }
 
   fun ensureContext(context: Context) {
@@ -128,7 +127,6 @@ object CallerManager {
   fun clearAllCallerList() {
     Log.d("CallerManager", "clearAllCallerList")
     Log.d("CallerManager", "clear allowed callers (" + allowedCallers.size + ")")
-    Log.d("CallerManager", "clear blocked callers (" + blockedCallers.size + ")")
     clearCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
     clearCallerList(blockedCallers, BLOCKED_CALLERS_FILE)
   }
