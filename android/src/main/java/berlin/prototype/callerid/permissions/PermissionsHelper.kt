@@ -20,6 +20,7 @@ import org.json.JSONObject
 import java.util.ArrayList
 
 import android.content.Context.ROLE_SERVICE
+import androidx.core.content.ContextCompat
 import berlin.prototype.callerid.ReactBridgeTools.convertJsonToMap
 
 class PermissionsHelper(private val reactContext: ReactApplicationContext) : PermissionListener, ActivityEventListener {
@@ -33,6 +34,12 @@ class PermissionsHelper(private val reactContext: ReactApplicationContext) : Per
 
   init {
     reactContext.addActivityEventListener(this)
+  }
+
+  fun hasContactPermissions(): Boolean {
+    val context = reactContext
+    return ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED &&
+      ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
   }
 
   fun isSystemAlertPermissionGranted(): Boolean {

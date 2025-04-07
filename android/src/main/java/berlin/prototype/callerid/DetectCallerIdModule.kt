@@ -2,16 +2,19 @@ package berlin.prototype.callerid
 
 import android.app.admin.DevicePolicyManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.telecom.TelecomManager
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.core.app.ActivityCompat
 import berlin.prototype.callerid.db.CallerManager
 import berlin.prototype.callerid.permissions.PermissionsHelper
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.ReadableMap
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -33,8 +36,17 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       contentProviderAvailable = hasGenuineAndroidDefaultDialer()
       workProfileAvailable = isInstalledOnWorkProfile()
 
-      // CallerManager also stores flags for contentProvider and workProfile mode
       CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
+
+      // Only start foreground service if we're in Samsung compatibility mode
+      if (!contentProviderAvailable && !workProfileAvailable) {
+        val serviceIntent = Intent(context, CallerForegroundService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(serviceIntent)
+        } else {
+          context.startService(serviceIntent)
+        }
+      }
     }
 
     @ReactMethod
@@ -49,6 +61,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     @ReactMethod
     fun getCallerIdMode(promise: Promise) {
+      Log.d("DetectCallerIdModule", "getCallerIdMode")
       if (workProfileAvailable) {
         promise.resolve("workProfileMode")
       }
@@ -61,11 +74,13 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun syncContacts(options: String, isVacationModeActive: Boolean, promise: Promise) {
-      if (!workProfileAvailable) {
-        promise.reject("DetectCallerId", "Syncing contacts while not in work profile mode is not supported by this plugin")
-        return
-      }
+    fun syncContacts(options: ReadableMap, isVacationModeActive: Boolean = false, promise: Promise) {
+      Log.d("DetectCallerIdModule", "syncContacts")
+
+//      if (!workProfileAvailable) {
+//        promise.reject("DetectCallerId", "Syncing contacts while not in work profile mode is not supported by this plugin")
+//        return
+//      }
 
       try {
         val manager = SyncContactsManager(context)
@@ -97,6 +112,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     @ReactMethod
     fun clearCallerList(promise: Promise) {
+      Log.d("DetectCallerIdModule", "clearCallerList")
       if (workProfileAvailable) {
         promise.reject("DetectCallerId", "Removing caller ids in work profile mode is not supported by this plugin")
       }
@@ -106,7 +122,34 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
+    fun ensureContactPermissions(promise: Promise) {
+      Log.d("DetectCallerIdModule", "ensureContactPermissions")
+
+      if (permissionsHelper.hasContactPermissions()) {
+        promise.resolve("granted")
+        return
+      }
+
+      val activity = currentActivity
+      if (activity != null) {
+        Log.d("DetectCallerIdModule", "ensureContactPermissions: requestPermissions")
+        ActivityCompat.requestPermissions(
+          activity,
+          arrayOf(
+            android.Manifest.permission.READ_CONTACTS,
+            android.Manifest.permission.WRITE_CONTACTS
+          ),
+          1002 // any request code
+        )
+        promise.resolve("requested")
+      } else {
+        promise.reject("NO_ACTIVITY", "Cannot request permissions: no current activity")
+      }
+    }
+
+    @ReactMethod
     fun checkPermissions(promise: Promise) {
+      Log.d("DetectCallerIdModule", "checkPermissions")
       if (workProfileAvailable) {
         promise.reject("DetectCallerId", "permissions are checked by expo-contacts plugin in work profile mode")
       }

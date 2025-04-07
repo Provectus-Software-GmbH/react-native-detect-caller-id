@@ -41,7 +41,8 @@ class CallerIdProvider : ContentProvider() {
     sortOrder: String?
   ): MatrixCursor? {
 
-    val cursor = MatrixCursor(projection)
+    val safeProjection = projection ?: arrayOf("contact_id", "display_name", "label", "photo_thumb_uri", "photo_uri")
+    val cursor = MatrixCursor(safeProjection)
     val rowBuilder = cursor.newRow()
 
     when (uriMatcher.match(uri)) {
@@ -49,7 +50,7 @@ class CallerIdProvider : ContentProvider() {
         rowBuilder.add("accountName", "SecContactsCallerID11")
         rowBuilder.add("accountType", "SecContactsCallerID11")
         rowBuilder.add("displayName", "SecContacts CallerID 11 Provider")
-        rowBuilder.add("typeResourceId", AUTHORITY)
+        rowBuilder.add("typeResourceId", R.string.caller_id_label)
         rowBuilder.add("exportSupport", 2)
         rowBuilder.add("shortcutSupport", 1)
         rowBuilder.add("photoSupport", 3)

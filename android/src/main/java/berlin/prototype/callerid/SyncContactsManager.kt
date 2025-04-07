@@ -13,11 +13,15 @@ import android.database.Cursor
 import android.os.Build
 import android.os.IBinder
 import android.provider.ContactsContract
+import android.util.Log
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import berlin.prototype.callerid.permissions.PermissionsHelper
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
+import com.facebook.react.bridge.ReadableMap
 import com.google.gson.Gson
 import org.json.JSONArray
 import org.json.JSONException
@@ -29,6 +33,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     private val context = reactContext
     private var SCAGroupID: Long = -1L        // Global group ID. Set by getOrCreateContactGroupId.
     private var progressCallback: ((Int) -> Unit)? = null
+    private val permissionsHelper = PermissionsHelper(reactContext)
 
     // Declare the module name
     override fun getName() = "SyncContactsManager"
@@ -40,11 +45,18 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         const val NOTIFICATION_ID = 101
     }
 
-    fun syncContacts(options: String, isVacationModeActive: Boolean, promise: Promise) {
+    fun syncContacts(options: ReadableMap, isVacationModeActive: Boolean, promise: Promise) {
+      Log.d("SyncContactsManager", "syncContacts")
+
+        if (!permissionsHelper.hasContactPermissions()) {
+            promise.reject("NO_ACTIVITY", "Cannot request permissions: no active activity.")
+            return
+        }
+
         try {
-            val jsonObject = JSONObject(options)
-            val items: JSONArray = jsonObject.getJSONArray("items")
-            val type: String = jsonObject.getString("type")
+            val json = (options.toHashMap() as Map<*, *>?)?.let { JSONObject(it) }
+            val items: JSONArray = json?.getJSONArray("items") ?: return
+            // val type: String = json.getString("type")
 
             // Start the foreground service to prevent process death during long operations.
             val serviceIntent = Intent(context, SyncContactsForegroundService::class.java)
@@ -54,7 +66,8 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
             Thread {
                 try {
                     // Create or get the SCA group ID.
-                    val groupId = getOrCreateContactGroupId(CONTACT_GROUP_NAME)
+                  SCAGroupID = getOrCreateContactGroupId(CONTACT_GROUP_NAME)
+                  Log.d("SyncContactsManager", "Assigned group ID: $SCAGroupID")
 
                     // Create a dictionary (map) to hold contacts to insert.
                     // Key: Unique source identifier; Value: Contact model.
@@ -64,16 +77,32 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                     // Process each contact JSON object.
                     for (i in 0 until items.length()) {
                         val contactJson = items.getJSONObject(i)
-                        // Parse the JSON into IProtoContact.
                         val protoContact = gson.fromJson(contactJson.toString(), IProtoContact::class.java)
-                        // Transform into the target Contact model.
                         val contact = transform(protoContact, isVacationModeActive)
-                        // Use a unique key from your source
                         contactsToInsert[protoContact.guid] = contact
                     }
 
+                    val existingHashes = getExistingIhashesInGroup(SCAGroupID)
+                    val newHashes = contactsToInsert.keys
+
+                    val toUpdate = existingHashes.intersect(newHashes)
+                    val toInsert = contactsToInsert.filterKeys { it !in existingHashes }
+                    val toDelete = existingHashes.subtract(newHashes)
+                    Log.d("SyncContactsManager", "toUpdate: ${toUpdate.size}, toInsert: ${toInsert.size}, toDelete: ${toDelete.size}")
+
+                    deleteContactsBySourceIds(toDelete)
+                    updateSendToVoicemailFlag(toUpdate, isVacationModeActive)
+
+                    if (isVacationModeActive) {
+                      val favoriteIhashes = contactsToInsert
+                        .filter { !it.value.sendToVoicemail }
+                        .map { it.key }
+                        .toSet()
+                      updateSendToVoicemailFlag(favoriteIhashes, false)
+                    }
+
                     // Insert the contacts in batch with progress updates.
-                    insertContacts(contactsToInsert, context.contentResolver, context)
+                    insertContacts(toInsert, context.contentResolver, context)
 
                     // Stop the foreground service when done.
                     context.stopService(serviceIntent)
@@ -89,7 +118,137 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
 
+  private fun updateSendToVoicemailFlag(sourceIds: Set<String>, value: Boolean) {
+    Log.d("SyncContactsManager", "updateSendToVoicemailFlag: $value")
+    val contentResolver = context.contentResolver
+
+    val BATCH_SIZE = 100
+    val ops = arrayListOf<ContentProviderOperation>()
+    var updatedCount = 0
+
+    sourceIds.chunked(BATCH_SIZE).forEachIndexed { batchIndex, chunk ->
+      ops.clear()
+
+      chunk.forEach { ihash ->
+        val cursor = contentResolver.query(
+          ContactsContract.RawContacts.CONTENT_URI,
+          arrayOf(ContactsContract.RawContacts._ID),
+          "${ContactsContract.RawContacts.SOURCE_ID} = ?",
+          arrayOf(ihash),
+          null
+        )
+
+        cursor?.use {
+          if (it.moveToFirst()) {
+            val rawContactId = it.getLong(0)
+            ops.add(
+              ContentProviderOperation.newUpdate(ContactsContract.RawContacts.CONTENT_URI)
+                .withSelection("${ContactsContract.RawContacts._ID} = ?", arrayOf(rawContactId.toString()))
+                .withValue(ContactsContract.RawContacts.SEND_TO_VOICEMAIL, if (value) 1 else 0)
+                .build()
+            )
+          }
+        }
+      }
+
+      if (ops.isNotEmpty()) {
+        try {
+          contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
+          updatedCount += ops.size
+          Log.d("SyncContactsManager", "Batch $batchIndex: Updated ${ops.size} contacts")
+        } catch (e: Exception) {
+          Log.e("SyncContactsManager", "Failed to update batch $batchIndex", e)
+        }
+      }
+    }
+
+    Log.d("SyncContactsManager", "Total sendToVoicemail = $value updates: $updatedCount")
+  }
+
+  fun getExistingIhashesInGroup(groupId: Long): Set<String> {
+    Log.d("SyncContactsManager", "getExistingIhashesInGroup")
+    val contentResolver = context.contentResolver
+    val rawContactIds = mutableSetOf<Long>()
+
+    // Step 1: Get all RAW_CONTACT_IDs that are members of the target group
+    val groupCursor = contentResolver.query(
+      ContactsContract.Data.CONTENT_URI,
+      arrayOf(ContactsContract.Data.RAW_CONTACT_ID),
+      "${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID} = ?",
+      arrayOf(
+        ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE,
+        groupId.toString()
+      ),
+      null
+    )
+
+    groupCursor?.use {
+      while (it.moveToNext()) {
+        val rawId = it.getLong(0)
+        rawContactIds.add(rawId)
+      }
+    }
+
+    if (rawContactIds.isEmpty()) return emptySet()
+
+    // Step 2: Query RawContacts for SOURCE_IDs matching those RAW_CONTACT_IDs
+    val ihashes = mutableSetOf<String>()
+    val selection = "${ContactsContract.RawContacts._ID} IN (${rawContactIds.joinToString(",")})"
+    val cursor = contentResolver.query(
+      ContactsContract.RawContacts.CONTENT_URI,
+      arrayOf(ContactsContract.RawContacts.SOURCE_ID),
+      selection,
+      null,
+      null
+    )
+
+    cursor?.use {
+      while (it.moveToNext()) {
+        val sourceId = it.getString(0)
+        if (!sourceId.isNullOrBlank()) {
+          ihashes.add(sourceId)
+        }
+      }
+    }
+
+    Log.d("SyncContactsManager", "Found ${ihashes.size} ihashes in group $groupId")
+    return ihashes
+  }
+
+  fun deleteContactsBySourceIds(sourceIds: Set<String>) {
+    Log.d("SyncContactsManager", "deleteContactsBySourceIds: ${sourceIds.size}")
+
+    val contentResolver = context.contentResolver
+    val batchSize = 100
+    val ops = mutableListOf<ContentProviderOperation>()
+
+    var deleted = 0
+
+    sourceIds.chunked(batchSize).forEach { chunk ->
+      chunk.forEach { ihash ->
+        ops.add(
+          ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
+            .withSelection("${ContactsContract.RawContacts.SOURCE_ID} = ?", arrayOf(ihash))
+            .build()
+        )
+      }
+
+      if (ops.isNotEmpty()) {
+        try {
+          contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
+          deleted += ops.size
+        } catch (e: Exception) {
+          Log.e("SyncContactsManager", "Batch delete failed", e)
+        }
+        ops.clear()
+      }
+    }
+
+    Log.d("SyncContactsManager", "Deleted $deleted contacts from SOURCE_IDs")
+  }
+
     private fun getOrCreateContactGroupId(groupName: String): Long {
+      Log.d("SyncContactsManager", "getOrCreateContactGroupId: ${groupName}")
         val contentResolver: ContentResolver = context.contentResolver
         var groupId: Long = -1
 
@@ -109,6 +268,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
         // If not found, create the group
         if (groupId == -1L) {
+            Log.d("SyncContactsManager", "${groupName} not found, creating new group")
             val op = ContentProviderOperation.newInsert(ContactsContract.Groups.CONTENT_URI)
                 .withValue(ContactsContract.Groups.TITLE, groupName)
                 .build()
@@ -143,31 +303,51 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
      * Inserts contacts in batch with progress updates and toast notifications.
      */
     fun insertContacts(
-        contactsDict: Map<String, Contact>,
-        contentResolver: ContentResolver,
-        context: Context
+      contactsDict: Map<String, Contact>,
+      contentResolver: ContentResolver,
+      context: Context
     ) {
-        val ops = ArrayList<ContentProviderOperation>()
-        val totalContacts = contactsDict.size
-        var counter = 1
+      val ops = ArrayList<ContentProviderOperation>()
+      val totalContacts = contactsDict.size
+      var counter = 1
 
-        contactsDict.forEach { (sourceContactID, contact) ->
-            createInsertContactOps(ops, contact, sourceContactID)
-            if (ops.size >= MAX_OPS_PER_BATCH) {
-                contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-                ops.clear()
-                val progress = (counter.toDouble() / totalContacts * 100).toInt()
-                progressCallback?.invoke(progress)
-                if (counter % 500 == 0) {
-                    //MainActivity.showToast(context, "Sync still in progress $progress%", longDuration = true)
-                }
-            }
-            counter++
+      val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+      contactsDict.forEach { (sourceContactID, contact) ->
+        createInsertContactOps(ops, contact, sourceContactID)
+
+        if (ops.size >= MAX_OPS_PER_BATCH) {
+          contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+          ops.clear()
+
+          val progress = (counter.toDouble() / totalContacts * 100).toInt()
+
+          val updatedNotification = NotificationCompat.Builder(context, SyncContactsManager.NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("Syncing Contacts")
+            .setContentText("Progress: $progress%")
+            .setSmallIcon(android.R.drawable.ic_popup_sync)
+            .setProgress(100, progress, false)
+            .build()
+
+          notificationManager.notify(SyncContactsManager.NOTIFICATION_ID, updatedNotification)
         }
 
-        if (ops.isNotEmpty()) {
-            contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-        }
+        counter++
+      }
+
+      if (ops.isNotEmpty()) {
+        contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+      }
+
+      // Final update — done
+      val doneNotification = NotificationCompat.Builder(context, SyncContactsManager.NOTIFICATION_CHANNEL_ID)
+        .setContentTitle("Sync Complete")
+        .setContentText("Contacts successfully synced")
+        .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+        .setProgress(0, 0, false)
+        .build()
+
+      notificationManager.notify(SyncContactsManager.NOTIFICATION_ID, doneNotification)
     }
 
     /**
@@ -183,10 +363,11 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         // Insert a new raw contact with a source ID.
         ops.add(
             ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
-                .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
-                .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
-                .withValue(ContactsContract.RawContacts.SOURCE_ID, sourceContactID)
-                .build()
+              .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, "com.android.localprofile")
+              .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, "Local Contacts")
+              .withValue(ContactsContract.RawContacts.SEND_TO_VOICEMAIL, if (contact.sendToVoicemail) 1 else 0)
+              .withValue(ContactsContract.RawContacts.SOURCE_ID, sourceContactID)
+              .build()
         )
 
         // Add the contact to the SCA group.
@@ -301,7 +482,7 @@ class SyncContactsForegroundService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, SyncContactsManager.NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Syncing Contacts")
             .setContentText("Please wait while contacts are being synced...")
-            .setSmallIcon(R.drawable.ic_popup_sync)
+            .setSmallIcon(android.R.drawable.ic_popup_sync)
             .build()
 
         // Start the service in the foreground
