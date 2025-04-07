@@ -1,5 +1,7 @@
 package berlin.prototype.callerid
 
+import android.util.Log
+
 // --- Input (JSON) data structures ---
 data class IProtoContact(
     //val addresses: List<IAddress>,
@@ -44,6 +46,7 @@ data class IContactItem(
  * Represents the target contact structure for syncing.
  */
 data class Contact(
+    val guid: String, // We are using ihash as the unique identifier.
     val contactType: String = "person",
     val name: String,
     val lastName: String,
@@ -68,39 +71,35 @@ data class Email(
 
 
 // --- Transformation Function ---
-fun transform(source: IProtoContact, sendToVoicemail: Boolean = false): Contact {
-    // Determine the contact's display name.
-    // If displayName is provided, use it.
-    // Otherwise, if a given name is available, combine surname and givenname.
-    // Else, fall back to just the surname.
-    val name = if (!source.displayName.isNullOrBlank()) {
-        source.displayName
-    } else if (source.givenname.isNotBlank()) {
-        "${source.surname}, ${source.givenname}"
-    } else {
-        source.surname
-    }
+fun transform(source: IProtoContact, isVacationModeActive: Boolean = false): Contact {
+  val name = when {
+    !source.displayName.isNullOrBlank() -> source.displayName
+    !source.givenname.isNullOrBlank() && !source.surname.isNullOrBlank() -> "${source.surname}, ${source.givenname}"
+    !source.surname.isNullOrBlank() -> source.surname
+    else -> "Unknown"
+  }
 
-    // Map phone numbers from the source structure.
-    val phoneNumbers = source.phonenumbers.map { item ->
-        PhoneNumber(number = item.value, label = item.label)
-    }
+  val phoneNumbers = source.phonenumbers.orEmpty()
+    .filter { !it.value.isNullOrBlank() }
+    .map { PhoneNumber(it.value, it.label) }
 
-    // Map email addresses from the source structure.
-    val emails = source.emailaddresses.map { item ->
-        Email(email = item.value, label = item.label)
-    }
+  val emails = source.emailaddresses.orEmpty()
+    .filter { !it.value.isNullOrBlank() }
+    .map { Email(it.value, it.label) }
 
-    return Contact(
-        contactType = "person",
-        name = name,
-        lastName = source.surname,
-        firstName = source.givenname,
-        company = source.company,
-        jobTitle = source.jobtitle,
-        department = source.department,
-        sendToVoicemail = sendToVoicemail,
-        phoneNumbers = phoneNumbers,
-        emails = emails
-    )
+  val sendToVoicemail = if (isVacationModeActive) !(source.isFavorite ?: false) else false
+
+  return Contact(
+    guid = source.ihash,
+    contactType = "person",
+    name = name,
+    lastName = source.surname.orEmpty(),
+    firstName = source.givenname.orEmpty(),
+    company = source.company.orEmpty(),
+    jobTitle = source.jobtitle.orEmpty(),
+    department = source.department.orEmpty(),
+    sendToVoicemail = sendToVoicemail,
+    phoneNumbers = phoneNumbers,
+    emails = emails
+  )
 }

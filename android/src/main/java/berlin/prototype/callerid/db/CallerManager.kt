@@ -24,29 +24,30 @@ object CallerManager {
   private const val BLOCKED_CALLERS_FILE = "blockedCallers.txt"
   private const val ALLOWED_CALLERS_FILE = "allowedCallers.txt"
 
-  private var appContext: ReactApplicationContext? = null
+  private var appContext: Context? = null
 
-  fun initialize(context: ReactApplicationContext, contentProvider: Boolean, workProfile: Boolean) {
-    appContext = context
+  fun initialize(context: Context, contentProvider: Boolean = false, workProfile: Boolean = false) {
+    appContext = context.applicationContext
+
     contentProviderAvailable = contentProvider
     workProfileAvailable = workProfile
 
-    // allowed and blocked callers are handled by system contacts app / expo-contacts plugin
-    if (workProfileAvailable) {
-      return
-    }
+    if (workProfileAvailable) return
 
     allowedCallers.addAll(getSavedCallerList(ALLOWED_CALLERS_FILE))
     blockedCallers.addAll(getSavedCallerList(BLOCKED_CALLERS_FILE))
 
     Log.d("CallerManager", "get saved allowed callers: ${allowedCallers.size}")
-    Log.d("CallerManager", "get saved blocked callers: ${blockedCallers.size}")
   }
 
   fun ensureContext(context: Context) {
     if (appContext == null) {
-      appContext = context.applicationContext as? ReactApplicationContext
-        ?: throw IllegalStateException("Context is not a ReactApplicationContext")
+      appContext = context.applicationContext
+    }
+    if (allowedCallers.isEmpty() && !workProfileAvailable) {
+      allowedCallers.addAll(getSavedCallerList(ALLOWED_CALLERS_FILE))
+      blockedCallers.addAll(getSavedCallerList(BLOCKED_CALLERS_FILE))
+      Log.d("CallerManager", "ensureContext: reloaded caller lists")
     }
   }
 
@@ -74,7 +75,7 @@ object CallerManager {
       val phoneNumber = item.getLong("phonenumber")
       val label = item.getString("label")
 
-      Log.d("CallerManager", "identifyCallers phoneNumber: $phoneNumber label: ${label}")
+      //Log.d("CallerManager", "identifyCallers phoneNumber: $phoneNumber label: ${label}")
       allowedCallers.add(Caller(phoneNumber.toString(), label))
     }
 
@@ -128,7 +129,6 @@ object CallerManager {
   fun clearAllCallerList() {
     Log.d("CallerManager", "clearAllCallerList")
     Log.d("CallerManager", "clear allowed callers (" + allowedCallers.size + ")")
-    Log.d("CallerManager", "clear blocked callers (" + blockedCallers.size + ")")
     clearCallerList(allowedCallers, ALLOWED_CALLERS_FILE)
     clearCallerList(blockedCallers, BLOCKED_CALLERS_FILE)
   }
