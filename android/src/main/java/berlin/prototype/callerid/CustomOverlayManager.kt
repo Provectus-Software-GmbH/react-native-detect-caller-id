@@ -252,7 +252,8 @@ class CustomOverlayManager : BroadcastReceiver() {
           .setAutoCancel(true)
           .build()
 
-        notificationManager.notify(1001, notification)
+        val uniqueNotificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+        notificationManager.notify(uniqueNotificationId, notification)
 
         return false
       }
