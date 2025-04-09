@@ -121,6 +121,14 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       promise.resolve("caller list cleared")
     }
 
+  @ReactMethod
+  fun clearContacts(promise: Promise) {
+    Log.d("DetectCallerIdModule", "clearContacts")
+    val syncContactsManager = SyncContactsManager(context)
+    syncContactsManager.clearContacts()
+    promise.resolve("contacts cleared")
+  }
+
     @ReactMethod
     fun ensureContactPermissions(promise: Promise) {
       Log.d("DetectCallerIdModule", "ensureContactPermissions")
