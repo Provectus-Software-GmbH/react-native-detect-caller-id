@@ -69,6 +69,19 @@ CallerDetector.requestPhonePermission = async () => {
 };
 
 //Android only
+CallerDetector.clearContacts = async () => {
+    try {
+        if (Platform.OS === 'android') {
+            return await CallerId.clearContacts();
+        } else {
+            return;
+        }
+    } catch (error) {
+        throw error;
+    }
+};
+
+//Android only
 CallerDetector.requestServicePermission = async () => {
     try {
         if (Platform.OS === 'android') {

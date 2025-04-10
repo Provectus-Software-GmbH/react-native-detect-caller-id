@@ -26,7 +26,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
   // Declare CallManager with the current context
   private val callManager = CallManager(context)
-  private val permissionsHelper = PermissionsHelper(reactContext)
+  private val permissionsHelper = PermissionsHelper(context)
 
     // Declare the module name
     override fun getName() = "DetectCallerId"
@@ -62,6 +62,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     @ReactMethod
     fun getCallerIdMode(promise: Promise) {
       Log.d("DetectCallerIdModule", "getCallerIdMode")
+
       if (workProfileAvailable) {
         promise.resolve("workProfileMode")
       }
@@ -110,16 +111,22 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
   }
 
-    @ReactMethod
-    fun clearCallerList(promise: Promise) {
-      Log.d("DetectCallerIdModule", "clearCallerList")
-      if (workProfileAvailable) {
-        promise.reject("DetectCallerId", "Removing caller ids in work profile mode is not supported by this plugin")
-      }
-
-      CallerManager.clearAllCallerList()
-      promise.resolve("caller list cleared")
+  @ReactMethod
+  fun clearCallerList(promise: Promise) {
+    Log.d("DetectCallerIdModule", "clearCallerList")
+    if (workProfileAvailable) {
+      promise.reject("DetectCallerId", "Removing caller ids in work profile mode is not supported by this plugin")
     }
+
+    CallerManager.clearAllCallerList()
+    promise.resolve("caller list cleared")
+  }
+
+  @ReactMethod
+  fun dummyCall(promise: Promise) {
+    Log.d("DetectCallerIdModule", "dummyCall")
+    promise.resolve("dummyCall")
+  }
 
   @ReactMethod
   fun clearContacts(promise: Promise) {
