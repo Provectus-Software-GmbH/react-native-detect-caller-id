@@ -227,12 +227,6 @@ class CustomOverlayManager : BroadcastReceiver() {
           putExtra("phone_number", phoneNumber)
         }
 
-        val pendingIntent = PendingIntent.getActivity(
-          context,
-          0,
-          intent,
-          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
         // Send the notification
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -244,15 +238,24 @@ class CustomOverlayManager : BroadcastReceiver() {
           notificationManager.createNotificationChannel(channel)
         }
 
+        val uniqueNotificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+        val pendingIntent = PendingIntent.getActivity(
+          context,
+          uniqueNotificationId,
+          intent,
+          PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = NotificationCompat.Builder(context, channelId)
           .setSmallIcon(android.R.drawable.stat_notify_missed_call) // TODO: Replace with app icon
           .setContentTitle(callerName)
           .setContentText("Missed call")
           .setContentIntent(pendingIntent)
           .setAutoCancel(true)
+          .setGroup("missed_calls") // Group all notifications together
+          .setAutoCancel(true)
           .build()
 
-        notificationManager.notify(1001, notification)
+        notificationManager.notify(uniqueNotificationId, notification)
 
         return false
       }

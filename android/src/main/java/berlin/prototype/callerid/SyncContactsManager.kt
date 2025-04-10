@@ -118,6 +118,74 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
 
+  fun clearContacts() {
+    Log.d("SyncContactsManager", "clearContacts: Clearing all contacts in group $SCAGroupID")
+
+    if (SCAGroupID == -1L) {
+      Log.e("SyncContactsManager", "SCAGroupID is not set. Cannot clear contacts.")
+      return
+    }
+
+    val contentResolver = context.contentResolver
+    val rawContactIds = mutableSetOf<Long>()
+
+    // Step 1: Query RAW_CONTACT_IDs that belong to the target group
+    val groupCursor = contentResolver.query(
+      ContactsContract.Data.CONTENT_URI,
+      arrayOf(ContactsContract.Data.RAW_CONTACT_ID),
+      "${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID} = ?",
+      arrayOf(
+        ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE,
+        SCAGroupID.toString()
+      ),
+      null
+    )
+
+    groupCursor?.use {
+      while (it.moveToNext()) {
+        val rawId = it.getLong(0)
+        rawContactIds.add(rawId)
+      }
+    }
+
+    if (rawContactIds.isEmpty()) {
+      Log.d("SyncContactsManager", "No contacts found in group $SCAGroupID to delete.")
+      return
+    }
+
+    // Step 2: Delete contacts in batches to optimize performance
+    val batchSize = MAX_OPS_PER_BATCH // Adjust based on testing (e.g., 500 or 1000 for larger datasets)
+    val ops = mutableListOf<ContentProviderOperation>()
+    var deletedCount = 0
+
+    val serviceIntent = Intent(context, SyncContactsForegroundService::class.java)
+    ContextCompat.startForegroundService(context, serviceIntent)
+
+    rawContactIds.chunked(batchSize).forEachIndexed { batchIndex, chunk ->
+      ops.clear()
+
+      chunk.forEach { rawContactId ->
+        ops.add(
+          ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
+            .withSelection("${ContactsContract.RawContacts._ID} = ?", arrayOf(rawContactId.toString()))
+            .build()
+        )
+      }
+
+      try {
+        contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
+        deletedCount += ops.size
+        Log.d("SyncContactsManager", "Batch $batchIndex: Deleted ${ops.size} contacts")
+      } catch (e: Exception) {
+        Log.e("SyncContactsManager", "Failed to delete batch $batchIndex", e)
+      }
+    }
+    context.stopService(serviceIntent)
+
+    Log.d("SyncContactsManager", "Total deleted contacts: $deletedCount")
+  }
+
+
   private fun updateSendToVoicemailFlag(sourceIds: Set<String>, value: Boolean) {
     Log.d("SyncContactsManager", "updateSendToVoicemailFlag: $value")
     val contentResolver = context.contentResolver
