@@ -122,8 +122,14 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     Log.d("SyncContactsManager", "clearContacts: Clearing all contacts in group $SCAGroupID")
 
     if (SCAGroupID == -1L) {
-      Log.e("SyncContactsManager", "SCAGroupID is not set. Cannot clear contacts.")
-      return
+      Log.e("SyncContactsManager", "SCAGroupID is not set. Trying to retreive.")
+
+      // Create or get the SCA group ID.
+      SCAGroupID = getOrCreateContactGroupId(CONTACT_GROUP_NAME)
+      if (SCAGroupID == -1L) {
+        Log.e("SyncContactsManager", "Failed to create or get SCA group ID. Cannot clear contacts.")
+        return
+      }
     }
 
     val contentResolver = context.contentResolver
