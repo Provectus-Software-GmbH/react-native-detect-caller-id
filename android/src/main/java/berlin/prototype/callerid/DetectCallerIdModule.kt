@@ -136,31 +136,31 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     promise.resolve("contacts cleared")
   }
 
-    @ReactMethod
-    fun ensureContactPermissions(promise: Promise) {
-      Log.d("DetectCallerIdModule", "ensureContactPermissions")
+  @ReactMethod
+  fun ensureContactPermissions(promise: Promise) {
+    Log.d("DetectCallerIdModule", "ensureContactPermissions")
 
-      if (permissionsHelper.hasContactPermissions()) {
-        promise.resolve("granted")
-        return
-      }
-
-      val activity = currentActivity
-      if (activity != null) {
-        Log.d("DetectCallerIdModule", "ensureContactPermissions: requestPermissions")
-        ActivityCompat.requestPermissions(
-          activity,
-          arrayOf(
-            android.Manifest.permission.READ_CONTACTS,
-            android.Manifest.permission.WRITE_CONTACTS
-          ),
-          1002 // any request code
-        )
-        promise.resolve("requested")
-      } else {
-        promise.reject("NO_ACTIVITY", "Cannot request permissions: no current activity")
-      }
+    if (permissionsHelper.hasContactPermissions()) {
+      promise.resolve("granted")
+      return
     }
+
+    val activity = currentActivity
+    if (activity != null) {
+      Log.d("DetectCallerIdModule", "ensureContactPermissions: requestPermissions")
+      ActivityCompat.requestPermissions(
+        activity,
+        arrayOf(
+          android.Manifest.permission.READ_CONTACTS,
+          android.Manifest.permission.WRITE_CONTACTS
+        ),
+        1002 // any request code
+      )
+      promise.resolve("requested")
+    } else {
+      promise.reject("NO_ACTIVITY", "Cannot request permissions: no current activity")
+    }
+  }
 
     @ReactMethod
     fun checkPermissions(promise: Promise) {
