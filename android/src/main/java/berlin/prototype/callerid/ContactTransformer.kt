@@ -47,6 +47,7 @@ data class IContactItem(
  */
 data class Contact(
     val guid: String, // We are using ihash as the unique identifier.
+    val sourceId: String, // we are using SCA-{ihash} as the source ID, to quickly identify our records by the prefix
     val contactType: String = "person",
     val name: String,
     val lastName: String,
@@ -91,6 +92,7 @@ fun transform(source: IProtoContact, isVacationModeActive: Boolean = false): Con
 
   return Contact(
     guid = source.ihash,
+    sourceId = "SCA-" + source.ihash,
     contactType = "person",
     name = name,
     lastName = source.surname.orEmpty(),
