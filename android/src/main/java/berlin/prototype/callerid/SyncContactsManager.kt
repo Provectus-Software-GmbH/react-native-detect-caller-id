@@ -9,6 +9,10 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -27,6 +31,7 @@ import com.google.gson.Gson
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 
 const val MAX_OPS_PER_BATCH = 400
 const val OPS_PER_TOAST = 2000
@@ -134,7 +139,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     val ops = arrayListOf<ContentProviderOperation>()
     ops.add(
       ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
-        .withSelection("${ContactsContract.RawContacts.SOURCE_ID} LIKE ?%", arrayOf("${CONTACT_PREFIX}%"))
+        .withSelection("${ContactsContract.RawContacts.SOURCE_ID} LIKE ?", arrayOf("${CONTACT_PREFIX}%"))
         .build()
     )
 
@@ -226,49 +231,36 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   fun deleteContactsBySourceIds(sourceIds: Set<String>) {
     Log.d("SyncContactsManager", "deleteContactsBySourceIds: ${sourceIds.size}")
 
-    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    ensureNotificationChannel(context)
-
     val contentResolver = context.contentResolver
     val ops = mutableListOf<ContentProviderOperation>()
 
     var deleted = 0
     val total = sourceIds.size
+    val batchSize = MAX_OPS_PER_BATCH
 
-    sourceIds.chunked(MAX_OPS_PER_BATCH).forEach { chunk ->
-      chunk.forEach { ihash ->
-        ops.add(
-          ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
-            .withSelection("${ContactsContract.RawContacts.SOURCE_ID} = ?", arrayOf(ihash))
-            .build()
-        )
+    sourceIds.chunked(batchSize).forEach { chunk ->
+      val placeholders = chunk.joinToString(",") { "?" }
+      val selection = "${ContactsContract.RawContacts.SOURCE_ID} IN ($placeholders)"
+
+      ops.add(
+        ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
+          .withSelection(selection, chunk.toTypedArray())
+          .build()
+      )
+
+      try {
+        contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
+        deleted += chunk.size
+        val progress = (deleted.toDouble() / total * 100).toInt()
+        Log.e("SyncContactsManager", "deleteContactsBySourceIds progress: $progress")
+      } catch (e: Exception) {
+        Log.e("SyncContactsManager", "Batch delete failed", e)
       }
-
-      if (ops.isNotEmpty()) {
-        try {
-          contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
-          deleted += ops.size
-          val progress = (deleted.toDouble() / total * 100).toInt()
-
-          val progressNotification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("Deleting Contacts")
-            .setContentText("Progress: $progress%")
-            .setSmallIcon(android.R.drawable.ic_menu_delete)
-            .setProgress(100, progress, false)
-            .build()
-          notificationManager.notify(NOTIFICATION_ID, progressNotification)
-
-        } catch (e: Exception) {
-          Log.e("SyncContactsManager", "Batch delete failed", e)
-        }
-        ops.clear()
-      }
+      ops.clear()
     }
 
     Log.d("SyncContactsManager", "Deleted $deleted contacts from SOURCE_IDs")
   }
-
-
 
     /**
      * Helper to build an insert ContentProviderOperation.
@@ -327,6 +319,8 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       if (ops.isNotEmpty()) {
         contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
       }
+
+      bulkUpdateAvatars(context, contentResolver)
 
       if (notifyProgress) {
         completeNotify("Finished syncing contacts")
@@ -442,6 +436,23 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                 )
             )
         }
+
+      // Insert placeholder image as avatar, to be replaced in bulk by SCA logo
+      val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+      bitmap.eraseColor(Color.TRANSPARENT) // or Color.BLACK, Color.WHITE
+      val stream = ByteArrayOutputStream()
+      bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+      val onePxImageBytes = stream.toByteArray()
+
+      ops.add(
+        buildInsertOp(
+          backReference = rawInsertIndex,
+          mimeType = ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
+          values = mapOf(
+            ContactsContract.CommonDataKinds.Photo.PHOTO to onePxImageBytes
+          )
+        )
+      )
     }
 
   private fun getOrCreateContactGroupId(groupName: String): Long {
@@ -490,8 +501,72 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     }
   }
 
+  fun bulkUpdateAvatars(context: Context, contentResolver: ContentResolver) {
+    val rawContactIds = mutableListOf<Long>()
+
+    // Step 1: Get RAW_CONTACT_IDs where SOURCE_ID LIKE 'SCA-%'
+    val cursor = contentResolver.query(
+      ContactsContract.RawContacts.CONTENT_URI,
+      arrayOf(ContactsContract.RawContacts._ID),
+      "${ContactsContract.RawContacts.SOURCE_ID} LIKE ?",
+      arrayOf("${CONTACT_PREFIX}%"),
+      null
+    )
+
+    cursor?.use {
+      val idIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts._ID)
+      while (cursor.moveToNext()) {
+        rawContactIds.add(cursor.getLong(idIndex))
+      }
+    }
+
+    if (rawContactIds.isEmpty()) return
+
+    // Step 2: Load app icon resource explicitly (replace with your actual resource ID)
+    val drawable = ContextCompat.getDrawable(context, R.drawable.logo) ?: return
+    val bitmap = if (drawable is BitmapDrawable) {
+      drawable.bitmap
+    } else {
+      val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
+      val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
+      val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+      val canvas = Canvas(bmp)
+      drawable.setBounds(0, 0, canvas.width, canvas.height)
+      drawable.draw(canvas)
+      bmp
+    }
+
+    val stream = ByteArrayOutputStream()
+    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+    val appIconBytes = stream.toByteArray()
+
+    // Step 3: Update Data rows for Photo MIMETYPE using RAW_CONTACT_ID IN (...)
+    val ops = mutableListOf<ContentProviderOperation>()
+    val maxChunkSize = 999 // SQLite limit
+
+    rawContactIds.chunked(maxChunkSize).forEach { chunk ->
+      val rawIdsString = chunk.joinToString(",")
+
+      ops.add(
+        ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
+          .withSelection(
+            "${ContactsContract.Data.RAW_CONTACT_ID} IN ($rawIdsString) AND ${ContactsContract.Data.MIMETYPE}=?",
+            arrayOf(ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
+          )
+          .withValue(ContactsContract.CommonDataKinds.Photo.PHOTO, appIconBytes)
+          .build()
+      )
+    }
+
+    // Step 4: Apply batch update
+    contentResolver.applyBatch(ContactsContract.AUTHORITY,
+      ops as java.util.ArrayList<ContentProviderOperation>
+    )
+  }
+
   private fun prepareNotify(title: String) {
     ensureNotificationChannel(context)
+    Looper.prepare()
     notificationBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
       .setContentTitle(title)
       .setContentText("Starting...")
@@ -503,16 +578,17 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   }
 
   fun notifyProgress(title: String, progressPercent: Int, updateToast: Boolean = false) {
+    Log.d("SyncContactsManager", "notifyProgress ${title} ${progressPercent}, updateToast: ${updateToast}")
+    if (updateToast) {
+      showToastOnMainThread("$title: $progressPercent%")
+    }
+
     notificationBuilder
       .setContentTitle(title)
       .setContentText("Progress: $progressPercent%")
       .setProgress(100, progressPercent, false)
 
     notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
-
-    if (updateToast) {
-      showToastOnMainThread("$title: $progressPercent%")
-    }
   }
 
   private fun completeNotify(title: String = "Done") {
@@ -528,6 +604,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   }
 
   private fun showToastOnMainThread(message: String) {
+    Log.d("SyncContactsManager", "showToastOnMainThread ${message}")
     Handler(Looper.getMainLooper()).post {
       Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }

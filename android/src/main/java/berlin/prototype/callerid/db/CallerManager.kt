@@ -27,6 +27,8 @@ object CallerManager {
   private var appContext: Context? = null
 
   fun initialize(context: Context, contentProvider: Boolean = false, workProfile: Boolean = false) {
+    Log.d("CallerManager", "initialize: ${contentProvider} ${workProfile}")
+
     appContext = context.applicationContext
 
     contentProviderAvailable = contentProvider

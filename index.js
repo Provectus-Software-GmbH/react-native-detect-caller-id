@@ -7,6 +7,7 @@ const { DetectCallerId: CallerId } = NativeModules;
 let CallerDetector = {
     checkPermissions: async () => { },
     ensureContactPermissions: async () => { },
+    init: async (forceAndroidMode: 'defaultMode' | 'compatibilityMode' | 'workProfileMode') => {},
     requestIosPermissions: async () => { },
     requestAndroidOverlayPermission: async () => { },
     requestAndroidPhonePermission: async () => { },
@@ -37,6 +38,17 @@ CallerDetector.checkPermissions = async () => {
 CallerDetector.ensureContactPermissions = async () => {
     try {
         return CallerId.ensureContactPermissions();
+    } catch (error) {
+        throw error;
+    }
+};
+
+// ios:  not implemented
+// android returns 'granted' | 'denied'
+CallerDetector.init = async (forceAndroidMode) => {
+  console.log('CallerDetector init');
+    try {
+        return CallerId.init(forceAndroidMode);
     } catch (error) {
         throw error;
     }
