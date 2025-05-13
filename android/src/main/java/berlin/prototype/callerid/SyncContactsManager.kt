@@ -579,6 +579,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
   private fun prepareNotify(title: String) {
     ensureNotificationChannel(context)
+    Looper.prepare()
     notificationBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
       .setContentTitle(title)
       .setContentText("Starting...")
@@ -590,16 +591,16 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   }
 
   fun notifyProgress(title: String, progressPercent: Int, updateToast: Boolean = false) {
+    if (updateToast) {
+      showToastOnMainThread("$title: $progressPercent%")
+    }
+
     notificationBuilder
       .setContentTitle(title)
       .setContentText("Progress: $progressPercent%")
       .setProgress(100, progressPercent, false)
 
     notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
-
-    if (updateToast) {
-      showToastOnMainThread("$title: $progressPercent%")
-    }
   }
 
   private fun completeNotify(title: String = "Done") {
