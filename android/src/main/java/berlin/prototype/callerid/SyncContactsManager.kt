@@ -34,7 +34,9 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
 const val MAX_OPS_PER_BATCH = 400
-const val OPS_PER_TOAST = 2000
+const val OPS_PER_TOAST = MAX_OPS_PER_BATCH * 4
+
+// TODO: No two in parallel
 
 class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     private val context = reactContext
@@ -300,19 +302,20 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
       contactsDict.forEach { (sourceContactID, contact) ->
         createInsertContactOps(ops, contact)
+        counter++
 
         if (ops.size >= MAX_OPS_PER_BATCH) {
           contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
           ops.clear()
 
-          if (notifyProgress) {
-            val progress = (counter.toDouble() / totalContacts * 100).toInt()
-            val updateToast = counter % OPS_PER_TOAST == 0
-            notifyProgress("Syncing contacts", progress, updateToast)
-          }
         }
 
-        counter++
+        if (notifyProgress && counter % MAX_OPS_PER_BATCH == 0) {
+          val progress = (counter.toDouble() / totalContacts * 100).toInt()
+          val updateToast = counter % OPS_PER_TOAST == 0
+          Log.d("SyncContactsManager", "insertContacts counter: $counter OPS_PER_TOAST: $OPS_PER_TOAST counter % OPS_PER_TOAST: ${counter % OPS_PER_TOAST}")
+          notifyProgress("Syncing contacts", progress, updateToast)
+        }
       }
 
       // Apply remaining ops
@@ -566,7 +569,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
   private fun prepareNotify(title: String) {
     ensureNotificationChannel(context)
-    Looper.prepare()
+
     notificationBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
       .setContentTitle(title)
       .setContentText("Starting...")
@@ -575,6 +578,8 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       .setOngoing(true)
 
     notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
+
+    showToastOnMainThread(title)
   }
 
   fun notifyProgress(title: String, progressPercent: Int, updateToast: Boolean = false) {
@@ -600,13 +605,13 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
     notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
 
-    Toast.makeText(context, title, Toast.LENGTH_SHORT).show()
+    showToastOnMainThread(title)
   }
 
   private fun showToastOnMainThread(message: String) {
-    Log.d("SyncContactsManager", "showToastOnMainThread ${message}")
+    Log.d("SyncContactsManager", "showToastOnMainThread $message")
     Handler(Looper.getMainLooper()).post {
-      Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+      Toast.makeText(context.applicationContext, message, Toast.LENGTH_SHORT).show()
     }
   }
 }
