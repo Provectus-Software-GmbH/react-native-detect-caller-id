@@ -139,7 +139,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     val ops = arrayListOf<ContentProviderOperation>()
     ops.add(
       ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
-        .withSelection("${ContactsContract.RawContacts.SOURCE_ID} LIKE ?%", arrayOf("${CONTACT_PREFIX}%"))
+        .withSelection("${ContactsContract.RawContacts.SOURCE_ID} LIKE ?", arrayOf("${CONTACT_PREFIX}%"))
         .build()
     )
 
@@ -231,49 +231,36 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   fun deleteContactsBySourceIds(sourceIds: Set<String>) {
     Log.d("SyncContactsManager", "deleteContactsBySourceIds: ${sourceIds.size}")
 
-    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    ensureNotificationChannel(context)
-
     val contentResolver = context.contentResolver
     val ops = mutableListOf<ContentProviderOperation>()
 
     var deleted = 0
     val total = sourceIds.size
+    val batchSize = MAX_OPS_PER_BATCH
 
-    sourceIds.chunked(MAX_OPS_PER_BATCH).forEach { chunk ->
-      chunk.forEach { ihash ->
-        ops.add(
-          ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
-            .withSelection("${ContactsContract.RawContacts.SOURCE_ID} = ?", arrayOf(ihash))
-            .build()
-        )
+    sourceIds.chunked(batchSize).forEach { chunk ->
+      val placeholders = chunk.joinToString(",") { "?" }
+      val selection = "${ContactsContract.RawContacts.SOURCE_ID} IN ($placeholders)"
+
+      ops.add(
+        ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
+          .withSelection(selection, chunk.toTypedArray())
+          .build()
+      )
+
+      try {
+        contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
+        deleted += chunk.size
+        val progress = (deleted.toDouble() / total * 100).toInt()
+        Log.e("SyncContactsManager", "deleteContactsBySourceIds progress: $progress")
+      } catch (e: Exception) {
+        Log.e("SyncContactsManager", "Batch delete failed", e)
       }
-
-      if (ops.isNotEmpty()) {
-        try {
-          contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
-          deleted += ops.size
-          val progress = (deleted.toDouble() / total * 100).toInt()
-
-          val progressNotification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("Deleting Contacts")
-            .setContentText("Progress: $progress%")
-            .setSmallIcon(android.R.drawable.ic_menu_delete)
-            .setProgress(100, progress, false)
-            .build()
-          notificationManager.notify(NOTIFICATION_ID, progressNotification)
-
-        } catch (e: Exception) {
-          Log.e("SyncContactsManager", "Batch delete failed", e)
-        }
-        ops.clear()
-      }
+      ops.clear()
     }
 
     Log.d("SyncContactsManager", "Deleted $deleted contacts from SOURCE_IDs")
   }
-
-
 
     /**
      * Helper to build an insert ContentProviderOperation.
@@ -522,7 +509,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       ContactsContract.RawContacts.CONTENT_URI,
       arrayOf(ContactsContract.RawContacts._ID),
       "${ContactsContract.RawContacts.SOURCE_ID} LIKE ?",
-      arrayOf("SCA-%"),
+      arrayOf("${CONTACT_PREFIX}%"),
       null
     )
 
@@ -591,6 +578,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   }
 
   fun notifyProgress(title: String, progressPercent: Int, updateToast: Boolean = false) {
+    Log.d("SyncContactsManager", "notifyProgress ${title} ${progressPercent}, updateToast: ${updateToast}")
     if (updateToast) {
       showToastOnMainThread("$title: $progressPercent%")
     }
@@ -616,6 +604,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   }
 
   private fun showToastOnMainThread(message: String) {
+    Log.d("SyncContactsManager", "showToastOnMainThread ${message}")
     Handler(Looper.getMainLooper()).post {
       Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
