@@ -6,12 +6,13 @@ const { DetectCallerId: CallerId } = NativeModules;
 
 let CallerDetector = {
     checkPermissions: async () => { },
+    ensureContactPermissions: async () => { },
     requestIosPermissions: async () => { },
     requestAndroidOverlayPermission: async () => { },
     requestAndroidPhonePermission: async () => { },
     requestAndroidServicePermission: async () => { },
     setCallerList: async (options: {
-        type: 'default' | 'allAllowed' | 'allBlocked',
+        type: 'block' | 'unblock' | 'identify' | 'default' | 'clearAll',
         items: { label: string; phonenumber: number, isRemoved: boolean, isBlocked: boolean }[],
     }) => { },
     clearCallerList: async () => { },
@@ -26,6 +27,16 @@ let CallerDetector = {
 CallerDetector.checkPermissions = async () => {
     try {
         return CallerId.checkPermissions();
+    } catch (error) {
+        throw error;
+    }
+};
+
+// ios:  not implemented
+// android returns 'granted' | 'denied'
+CallerDetector.ensureContactPermissions = async () => {
+    try {
+        return CallerId.ensureContactPermissions();
     } catch (error) {
         throw error;
     }
