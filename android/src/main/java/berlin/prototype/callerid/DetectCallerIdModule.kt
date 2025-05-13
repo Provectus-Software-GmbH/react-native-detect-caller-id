@@ -33,21 +33,39 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     override fun initialize() {
       super.initialize()
-      contentProviderAvailable = hasGenuineAndroidDefaultDialer()
-      workProfileAvailable = isInstalledOnWorkProfile()
 
-      CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
+    }
 
-      // Only start foreground service if we're in Samsung compatibility mode
-      if (!contentProviderAvailable && !workProfileAvailable) {
-        val serviceIntent = Intent(context, CallerForegroundService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          context.startForegroundService(serviceIntent)
-        } else {
-          context.startService(serviceIntent)
-        }
+  @ReactMethod
+  fun init(forceAndroidMode: String = "none", promise: Promise) {
+    Log.d("DetectCallerIdModule", "init: $forceAndroidMode")
+
+    val forceWorkProfile = forceAndroidMode == "workProfileMode";
+    val forceDefaultMode = forceAndroidMode == "defaultMode";
+    val forceCompatibilityMode = forceAndroidMode == "compatibilityMode";
+
+    contentProviderAvailable = forceDefaultMode || hasGenuineAndroidDefaultDialer()
+    workProfileAvailable = forceWorkProfile || isInstalledOnWorkProfile()
+
+    if (forceCompatibilityMode) {
+      contentProviderAvailable = false
+      workProfileAvailable = false
+    }
+
+    CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
+
+    // Only start foreground service if we're in Samsung compatibility mode
+    if (!contentProviderAvailable && !workProfileAvailable) {
+      val serviceIntent = Intent(context, CallerForegroundService::class.java)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(serviceIntent)
+      } else {
+        context.startService(serviceIntent)
       }
     }
+
+    promise.resolve("init completed");
+  }
 
     @ReactMethod
     fun simulateIncomingCall(phoneNumber: String, promise: Promise) {
@@ -78,10 +96,10 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     fun syncContacts(options: ReadableMap, isVacationModeActive: Boolean = false, promise: Promise) {
       Log.d("DetectCallerIdModule", "syncContacts")
 
-//      if (!workProfileAvailable) {
-//        promise.reject("DetectCallerId", "Syncing contacts while not in work profile mode is not supported by this plugin")
-//        return
-//      }
+      if (!workProfileAvailable) {
+        promise.reject("DetectCallerId", "Syncing contacts while not in work profile mode is not supported by this plugin")
+        return
+      }
 
       try {
         val manager = SyncContactsManager(context)
