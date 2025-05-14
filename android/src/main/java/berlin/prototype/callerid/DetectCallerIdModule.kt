@@ -23,6 +23,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
   private val context = reactContext
   private var contentProviderAvailable = false // true for default mode, false for compatibility mode
   private var workProfileAvailable = false // true for work profile mode (SyncToLocalContacts)
+  private var isCallerManagerInitialized = false
 
   // Declare CallManager with the current context
   private val callManager = CallManager(context)
@@ -51,8 +52,6 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
       contentProviderAvailable = false
       workProfileAvailable = false
     }
-
-    CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
 
     // Only start foreground service if we're in Samsung compatibility mode
     if (!contentProviderAvailable && !workProfileAvailable) {
@@ -115,6 +114,11 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
     if (workProfileAvailable) {
       promise.reject("DetectCallerId", "Setting up caller ids in work profile mode is not supported by this plugin")
+    }
+
+    if (isCallerManagerInitialized == false) {
+      CallerManager.initialize(context, contentProviderAvailable, workProfileAvailable)
+      isCallerManagerInitialized = true
     }
 
     try {
