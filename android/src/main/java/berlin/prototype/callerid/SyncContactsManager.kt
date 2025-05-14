@@ -159,12 +159,12 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     val contentResolver = context.contentResolver
     val mappedIds = mutableMapOf<String, Long>()
 
-    val selection = "${ContactsContract.RawContacts.SOURCE_ID} LIKE ?"
+    val selection = "${ContactsContract.RawContacts.SOURCE_ID} LIKE ? AND ${ContactsContract.RawContacts.DELETED} = 0"
     val selectionArgs = arrayOf("${CONTACT_PREFIX}%")
 
     val cursor = contentResolver.query(
       ContactsContract.RawContacts.CONTENT_URI,
-      arrayOf(ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts._ID, ContactsContract.RawContacts.DISPLAY_NAME_PRIMARY),
+      arrayOf(ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts._ID),
       selection,
       selectionArgs,
       null
@@ -173,19 +173,13 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     cursor?.use {
       val sourceIdIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts.SOURCE_ID)
       val rawIdIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts._ID)
-      val name = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts.DISPLAY_NAME_PRIMARY)
-      var counter = 0;
+
       while (cursor.moveToNext()) {
         val sourceId = cursor.getString(sourceIdIndex)
         val rawId = cursor.getLong(rawIdIndex)
         if (!sourceId.isNullOrBlank()) {
           mappedIds[sourceId] = rawId
         }
-
-        if (counter % MAX_OPS_PER_BATCH == 0 ) {
-          Log.d("SyncContactsManager", "Display name: ${cursor.getString(name)}")
-        }
-          counter++
       }
     }
 
