@@ -65,7 +65,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       Log.d("SyncContactsManager", "syncContacts")
 
         if (!permissionsHelper.hasContactPermissions()) {
-            promise.reject("NO_ACTIVITY", "Cannot request permissions: no active activity.")
+            //promise.reject("NO_ACTIVITY", "Cannot request permissions: no active activity.")
             return
         }
 
