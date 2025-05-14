@@ -34,9 +34,10 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
 const val MAX_OPS_PER_BATCH = 400
+const val MAX_SQL_PARAM_LIMIT = 999
 const val OPS_PER_TOAST = MAX_OPS_PER_BATCH * 4
 
-// TODO: No two in parallel
+// TODO: No two syncs in parallel
 
 class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     private val context = reactContext
@@ -84,40 +85,37 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                   sCAGroupID = getOrCreateContactGroupId(CONTACT_GROUP_NAME)
                   Log.d("SyncContactsManager", "Assigned group ID: $sCAGroupID")
 
-                    // Create a dictionary (map) to hold contacts to insert.
-                    // Key: Unique source identifier; Value: Contact model.
-                    val contactsToInsert = mutableMapOf<String, Contact>()
+                    val newContacts = getMappedContacts(items, isVacationModeActive)
+                    val oldContacts = getMappedRawIds()
 
-                    val gson = Gson()
-                    // Process each contact JSON object.
-                    for (i in 0 until items.length()) {
-                        val contactJson = items.getJSONObject(i)
-                        val protoContact = gson.fromJson(contactJson.toString(), IProtoContact::class.java)
-                        val contact = transform(protoContact, isVacationModeActive)
-                        contactsToInsert[protoContact.guid] = contact
-                    }
+                    val newHashes = newContacts.keys
+                    val oldHashes = oldContacts.keys
 
-                    val existingHashes = getExistingIhashes()
-                    val newHashes = contactsToInsert.keys
+                    val hashesToUpdate = oldHashes.intersect(newHashes)
+                    val hashesToDelete = oldHashes.subtract(newHashes)
 
-                    val toUpdate = existingHashes.intersect(newHashes)
-                    val toInsert = contactsToInsert.filterKeys { it !in existingHashes }
-                    val toDelete = existingHashes.subtract(newHashes)
-                    Log.d("SyncContactsManager", "toUpdate: ${toUpdate.size}, toInsert: ${toInsert.size}, toDelete: ${toDelete.size}")
+                    val contactToInsert = newContacts.filterKeys { it !in oldContacts }
 
-                    deleteContactsBySourceIds(toDelete)
-                    updateSendToVoicemailFlag(toUpdate, isVacationModeActive)
+                    val rawIdsToUpdate = oldContacts.filterKeys { it in hashesToUpdate }.values
+                    val rawIdsToDelete = oldContacts.filterKeys { it in hashesToDelete }.values
+
+                    Log.d("SyncContactsManager", "unchanged: ${rawIdsToUpdate.size}, toInsert: ${contactToInsert.size}, toDelete: ${rawIdsToDelete.size}")
+
+                    deleteContactsByRawIds(rawIdsToDelete)
+                    updateSendToVoicemailFlag(rawIdsToUpdate, isVacationModeActive)
 
                     if (isVacationModeActive) {
-                      val favoriteIhashes = contactsToInsert
-                        .filter { !it.value.sendToVoicemail }
-                        .map { it.key }
-                        .toSet()
-                      updateSendToVoicemailFlag(favoriteIhashes, false)
+                      val favoritesHashes = newContacts
+                        .filterKeys { it in hashesToUpdate }
+                        .filterValues { !it.sendToVoicemail }.keys
+                      val rawIdsToUnblock = oldContacts.filterKeys { it in favoritesHashes }.values
+                      Log.d("SyncContactsManager", "vacationModeActive, unblocking favorites: ${rawIdsToUnblock.size}")
+
+                      updateSendToVoicemailFlag(rawIdsToUnblock, false)
                     }
 
                     // Insert the contacts in batch with progress updates.
-                    insertContacts(toInsert, context.contentResolver)
+                    insertContacts(contactToInsert, context.contentResolver)
 
                     // Stop the foreground service when done.
                     context.stopService(serviceIntent)
@@ -133,135 +131,129 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
 
-  fun clearContacts() {
-    Log.d("SyncContactsManager", "clearContacts: Clearing all contacts with prefix $CONTACT_PREFIX")
-
-    val contentResolver = context.contentResolver
-
-    val ops = arrayListOf<ContentProviderOperation>()
-    ops.add(
-      ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
-        .withSelection("${ContactsContract.RawContacts.SOURCE_ID} LIKE ?", arrayOf("${CONTACT_PREFIX}%"))
-        .build()
-    )
-
-    try {
-      val results = contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
-      val deletedCount = results[0].count
-      Log.d("SyncContactsManager", "Deleted contacts count: $deletedCount")
-    } catch (e: Exception) {
-      Log.e("SyncContactsManager", "Failed to delete contacts", e)
-    }
-  }
-
-  private fun updateSendToVoicemailFlag(sourceIds: Set<String>, value: Boolean) {
-    Log.d("SyncContactsManager", "updateSendToVoicemailFlag: $value")
-    val contentResolver = context.contentResolver
-
-    val ops = arrayListOf<ContentProviderOperation>()
-    var updatedCount = 0
-
-    sourceIds.chunked(MAX_OPS_PER_BATCH).forEachIndexed { batchIndex, chunk ->
-      ops.clear()
-
-      chunk.forEach { ihash ->
-        val cursor = contentResolver.query(
-          ContactsContract.RawContacts.CONTENT_URI,
-          arrayOf(ContactsContract.RawContacts._ID),
-          "${ContactsContract.RawContacts.SOURCE_ID} = ?",
-          arrayOf(ihash),
-          null
-        )
-
-        cursor?.use {
-          if (it.moveToFirst()) {
-            val rawContactId = it.getLong(0)
-            ops.add(
-              ContentProviderOperation.newUpdate(ContactsContract.RawContacts.CONTENT_URI)
-                .withSelection("${ContactsContract.RawContacts._ID} = ?", arrayOf(rawContactId.toString()))
-                .withValue(ContactsContract.RawContacts.SEND_TO_VOICEMAIL, if (value) 1 else 0)
-                .build()
-            )
-          }
-        }
-      }
-
-      if (ops.isNotEmpty()) {
-        try {
-          contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
-          updatedCount += ops.size
-          Log.d("SyncContactsManager", "Batch $batchIndex: Updated ${ops.size} contacts")
-        } catch (e: Exception) {
-          Log.e("SyncContactsManager", "Failed to update batch $batchIndex", e)
-        }
-      }
+  // Create a dictionary (map) to hold contacts to insert.
+  // Key: Source id (SCA-${hash}; Value: Contact model.
+  private fun getMappedContacts(
+      items: JSONArray,
+      isVacationModeActive: Boolean
+  ): MutableMap<String, Contact> {
+    val contactsToInsert = mutableMapOf<String, Contact>()
+    val gson = Gson()
+    // Process each contact JSON object.
+    for (i in 0 until items.length()) {
+      val contactJson = items.getJSONObject(i)
+      val protoContact = gson.fromJson(contactJson.toString(), IProtoContact::class.java)
+      val contact = transform(protoContact, isVacationModeActive)
+      contactsToInsert[contact.sourceId] = contact
     }
 
-    Log.d("SyncContactsManager", "Total sendToVoicemail = $value updates: $updatedCount")
+    return contactsToInsert
   }
 
-  fun getExistingIhashes(): Set<String> {
-    Log.d("SyncContactsManager", "getExistingIhashes")
+
+  // Create a dictionary (map) to hold existing contact raw ids
+  // Key: Source id (SCA-${hash}; Value: raw id of contact
+  fun getMappedRawIds(): Map<String, Long> {
+    Log.d("SyncContactsManager", "getMappedRawIds")
 
     val contentResolver = context.contentResolver
-    val ihashes = mutableSetOf<String>()
+    val mappedIds = mutableMapOf<String, Long>()
 
     val selection = "${ContactsContract.RawContacts.SOURCE_ID} LIKE ?"
     val selectionArgs = arrayOf("${CONTACT_PREFIX}%")
 
     val cursor = contentResolver.query(
       ContactsContract.RawContacts.CONTENT_URI,
-      arrayOf(ContactsContract.RawContacts.SOURCE_ID),
+      arrayOf(ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts._ID),
       selection,
       selectionArgs,
       null
     )
 
     cursor?.use {
-      while (it.moveToNext()) {
-        val sourceId = it.getString(0)
+      val sourceIdIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts.SOURCE_ID)
+      val rawIdIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts._ID)
+      while (cursor.moveToNext()) {
+        val sourceId = cursor.getString(sourceIdIndex)
+        val rawId = cursor.getLong(rawIdIndex)
         if (!sourceId.isNullOrBlank()) {
-          ihashes.add(sourceId)
+          mappedIds[sourceId] = rawId
         }
       }
     }
 
-    Log.d("SyncContactsManager", "Found ${ihashes.size} ihashes with prefix $CONTACT_PREFIX")
-    return ihashes
+    Log.d("SyncContactsManager", "Mapped ${mappedIds.size} sourceIds to raw IDs")
+    return mappedIds
   }
 
-  fun deleteContactsBySourceIds(sourceIds: Set<String>) {
-    Log.d("SyncContactsManager", "deleteContactsBySourceIds: ${sourceIds.size}")
+  fun clearContacts() {
+    Log.d("SyncContactsManager", "clearContacts: Clearing all contacts with prefix $CONTACT_PREFIX")
+
+    val oldContactsRawIds = getMappedRawIds().values
+    deleteContactsByRawIds(oldContactsRawIds)
+  }
+
+  fun deleteContactsByRawIds(rawContactIds: Collection<Long>) {
+    Log.d("SyncContactsManager", "deleteContactsByRawIds: ${rawContactIds.size}")
+
+    if (rawContactIds.isEmpty()) return
 
     val contentResolver = context.contentResolver
-    val ops = mutableListOf<ContentProviderOperation>()
+    val chunkSize = MAX_SQL_PARAM_LIMIT // SQLite parameter limit
+    var totalDeleted = 0
 
-    var deleted = 0
-    val total = sourceIds.size
-    val batchSize = MAX_OPS_PER_BATCH
-
-    sourceIds.chunked(batchSize).forEach { chunk ->
+    rawContactIds.chunked(chunkSize).forEach { chunk ->
       val placeholders = chunk.joinToString(",") { "?" }
-      val selection = "${ContactsContract.RawContacts.SOURCE_ID} IN ($placeholders)"
-
-      ops.add(
-        ContentProviderOperation.newDelete(ContactsContract.RawContacts.CONTENT_URI)
-          .withSelection(selection, chunk.toTypedArray())
-          .build()
-      )
+      val selection = "${ContactsContract.RawContacts._ID} IN ($placeholders)"
 
       try {
-        contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
-        deleted += chunk.size
-        val progress = (deleted.toDouble() / total * 100).toInt()
-        Log.e("SyncContactsManager", "deleteContactsBySourceIds progress: $progress")
+        val deletedCount = contentResolver.delete(
+          ContactsContract.RawContacts.CONTENT_URI,
+          selection,
+          chunk.map { it.toString() }.toTypedArray()
+        )
+        totalDeleted += deletedCount
+        Log.d("SyncContactsManager", "Deleted $deletedCount raw contacts in chunk")
       } catch (e: Exception) {
-        Log.e("SyncContactsManager", "Batch delete failed", e)
+        Log.e("SyncContactsManager", "Failed to delete raw contacts in chunk", e)
       }
-      ops.clear()
     }
 
-    Log.d("SyncContactsManager", "Deleted $deleted contacts from SOURCE_IDs")
+    Log.d("SyncContactsManager", "Total deleted raw contacts: $totalDeleted")
+  }
+
+  fun updateSendToVoicemailFlag(rawContactIds: Collection<Long>, value: Boolean) {
+    Log.d("SyncContactsManager", "updateSendToVoicemailFlag: ${rawContactIds.size} contacts to ${if (value) "enable" else "disable"} voicemail flag")
+
+    if (rawContactIds.isEmpty()) return
+
+    val contentResolver = context.contentResolver
+    val chunkSize = MAX_SQL_PARAM_LIMIT
+    var totalUpdated = 0
+
+    rawContactIds.chunked(chunkSize).forEach { chunk ->
+      val placeholders = chunk.joinToString(",") { "?" }
+      val selection = "${ContactsContract.RawContacts._ID} IN ($placeholders)"
+      val selectionArgs = chunk.map { it.toString() }.toTypedArray()
+      val contentValues = android.content.ContentValues().apply {
+        put(ContactsContract.RawContacts.SEND_TO_VOICEMAIL, if (value) 1 else 0)
+      }
+
+      try {
+        val updatedCount = contentResolver.update(
+          ContactsContract.RawContacts.CONTENT_URI,
+          contentValues,
+          selection,
+          selectionArgs
+        )
+        totalUpdated += updatedCount
+        Log.d("SyncContactsManager", "Updated $updatedCount raw contacts in chunk")
+      } catch (e: Exception) {
+        Log.e("SyncContactsManager", "Failed to update sendToVoicemail flag in chunk", e)
+      }
+    }
+
+    Log.d("SyncContactsManager", "Total updated sendToVoicemail flags: $totalUpdated")
   }
 
     /**
@@ -505,27 +497,13 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   }
 
   fun bulkUpdateAvatars(context: Context, contentResolver: ContentResolver) {
-    val rawContactIds = mutableListOf<Long>()
+    val rawContactIds = getMappedRawIds().values
 
-    // Step 1: Get RAW_CONTACT_IDs where SOURCE_ID LIKE 'SCA-%'
-    val cursor = contentResolver.query(
-      ContactsContract.RawContacts.CONTENT_URI,
-      arrayOf(ContactsContract.RawContacts._ID),
-      "${ContactsContract.RawContacts.SOURCE_ID} LIKE ?",
-      arrayOf("${CONTACT_PREFIX}%"),
-      null
-    )
-
-    cursor?.use {
-      val idIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts._ID)
-      while (cursor.moveToNext()) {
-        rawContactIds.add(cursor.getLong(idIndex))
-      }
-    }
+    Log.d("SyncContactsManager", "bulkUpdateAvatars: ${rawContactIds.size} contacts")
 
     if (rawContactIds.isEmpty()) return
 
-    // Step 2: Load app icon resource explicitly (replace with your actual resource ID)
+    // Load the logo drawable
     val drawable = ContextCompat.getDrawable(context, R.drawable.logo) ?: return
     val bitmap = if (drawable is BitmapDrawable) {
       drawable.bitmap
@@ -543,28 +521,29 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
     val appIconBytes = stream.toByteArray()
 
-    // Step 3: Update Data rows for Photo MIMETYPE using RAW_CONTACT_ID IN (...)
     val ops = mutableListOf<ContentProviderOperation>()
-    val maxChunkSize = 999 // SQLite limit
 
-    rawContactIds.chunked(maxChunkSize).forEach { chunk ->
-      val rawIdsString = chunk.joinToString(",")
+    rawContactIds.chunked(MAX_SQL_PARAM_LIMIT).forEach { chunk ->
+      val placeholders = chunk.joinToString(",") { "?" }
+      val selection = "${ContactsContract.Data.RAW_CONTACT_ID} IN ($placeholders) AND ${ContactsContract.Data.MIMETYPE} = ?"
+      val selectionArgs = chunk.map { it.toString() } + ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE
 
       ops.add(
         ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
-          .withSelection(
-            "${ContactsContract.Data.RAW_CONTACT_ID} IN ($rawIdsString) AND ${ContactsContract.Data.MIMETYPE}=?",
-            arrayOf(ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
-          )
+          .withSelection(selection, selectionArgs.toTypedArray())
           .withValue(ContactsContract.CommonDataKinds.Photo.PHOTO, appIconBytes)
           .build()
       )
     }
 
-    // Step 4: Apply batch update
-    contentResolver.applyBatch(ContactsContract.AUTHORITY,
-      ops as java.util.ArrayList<ContentProviderOperation>
-    )
+    if (ops.isNotEmpty()) {
+      try {
+        contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(ops))
+        Log.d("SyncContactsManager", "Updated avatars for ${rawContactIds.size} contacts")
+      } catch (e: Exception) {
+        Log.e("SyncContactsManager", "Failed to bulk update avatars", e)
+      }
+    }
   }
 
   private fun prepareNotify(title: String) {
