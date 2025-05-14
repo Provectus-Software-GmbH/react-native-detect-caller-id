@@ -108,6 +108,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                       val favoritesHashes = newContacts
                         .filterKeys { it in hashesToUpdate }
                         .filterValues { !it.sendToVoicemail }.keys
+
                       val rawIdsToUnblock = oldContacts.filterKeys { it in favoritesHashes }.values
                       Log.d("SyncContactsManager", "vacationModeActive, unblocking favorites: ${rawIdsToUnblock.size}")
 
@@ -300,6 +301,8 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       contentResolver: ContentResolver
     ) {
       Log.e("SyncContactsManager", "insertContacts, ${contactsDict.size} contacts")
+
+      if (contactsDict.isEmpty()) return
 
       val ops = ArrayList<ContentProviderOperation>()
       val totalContacts = contactsDict.size
