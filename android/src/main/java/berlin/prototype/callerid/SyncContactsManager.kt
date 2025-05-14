@@ -61,7 +61,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         const val NOTIFICATION_ID = 101
     }
 
-    fun syncContacts(options: ReadableMap, isVacationModeActive: Boolean, promise: Promise) {
+    fun syncContacts(options: ReadableMap, isVacationModeActive: Boolean) {
       Log.d("SyncContactsManager", "syncContacts")
 
         if (!permissionsHelper.hasContactPermissions()) {
@@ -120,15 +120,15 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
                     // Stop the foreground service when done.
                     context.stopService(serviceIntent)
-                    promise.resolve("synced to local contacts")
+                    //promise.resolve("synced to local contacts")
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    promise.reject("SYNC_ERROR", "Failed to sync contacts", e)
+                    //promise.reject("SYNC_ERROR", "Failed to sync contacts", e)
                 }
             }.start()
         } catch (e: JSONException) {
             e.printStackTrace()
-            promise.reject("PARSE_ERROR", "Failed to parse JSON", e)
+            // promise.reject("PARSE_ERROR", "Failed to parse JSON", e)
         }
     }
 

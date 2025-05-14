@@ -102,7 +102,8 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
 
       try {
         val manager = SyncContactsManager(context)
-        manager.syncContacts(options, isVacationModeActive, promise)
+        manager.syncContacts(options, isVacationModeActive)
+        promise.resolve("synced to local contacts")
       } catch (e: JSONException) {
         e.printStackTrace()
       }
