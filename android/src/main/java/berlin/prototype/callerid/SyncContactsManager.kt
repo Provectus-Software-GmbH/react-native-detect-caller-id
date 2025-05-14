@@ -94,7 +94,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                     val hashesToUpdate = oldHashes.intersect(newHashes)
                     val hashesToDelete = oldHashes.subtract(newHashes)
 
-                    val contactToInsert = newContacts.filterKeys { it !in oldContacts }
+                    val contactToInsert = newContacts.filterKeys { it !in oldHashes }
 
                     val rawIdsToUpdate = oldContacts.filterKeys { it in hashesToUpdate }.values
                     val rawIdsToDelete = oldContacts.filterKeys { it in hashesToDelete }.values
@@ -164,7 +164,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
 
     val cursor = contentResolver.query(
       ContactsContract.RawContacts.CONTENT_URI,
-      arrayOf(ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts._ID),
+      arrayOf(ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts._ID, ContactsContract.RawContacts.DISPLAY_NAME_PRIMARY),
       selection,
       selectionArgs,
       null
@@ -173,12 +173,19 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     cursor?.use {
       val sourceIdIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts.SOURCE_ID)
       val rawIdIndex = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts._ID)
+      val name = cursor.getColumnIndexOrThrow(ContactsContract.RawContacts.DISPLAY_NAME_PRIMARY)
+      var counter = 0;
       while (cursor.moveToNext()) {
         val sourceId = cursor.getString(sourceIdIndex)
         val rawId = cursor.getLong(rawIdIndex)
         if (!sourceId.isNullOrBlank()) {
           mappedIds[sourceId] = rawId
         }
+
+        if (counter % MAX_OPS_PER_BATCH == 0 ) {
+          Log.d("SyncContactsManager", "Display name: ${cursor.getString(name)}")
+        }
+          counter++
       }
     }
 
@@ -202,6 +209,12 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     val chunkSize = MAX_SQL_PARAM_LIMIT // SQLite parameter limit
     var totalDeleted = 0
 
+    val notifyProgress = rawContactIds.size > MAX_OPS_PER_BATCH
+
+    if (notifyProgress) {
+      prepareNotify("Prepare deleting contacts")
+    }
+
     rawContactIds.chunked(chunkSize).forEach { chunk ->
       val placeholders = chunk.joinToString(",") { "?" }
       val selection = "${ContactsContract.RawContacts._ID} IN ($placeholders)"
@@ -214,9 +227,19 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         )
         totalDeleted += deletedCount
         Log.d("SyncContactsManager", "Deleted $deletedCount raw contacts in chunk")
+
+        if (notifyProgress) {
+          val progress = (totalDeleted.toDouble() / rawContactIds.size * 100).toInt()
+          val updateToast = totalDeleted % OPS_PER_TOAST == 0
+          notifyProgress("Deleting contacts", progress, updateToast)
+        }
       } catch (e: Exception) {
         Log.e("SyncContactsManager", "Failed to delete raw contacts in chunk", e)
       }
+    }
+
+    if (notifyProgress) {
+      completeNotify("Finished deleting contacts")
     }
 
     Log.d("SyncContactsManager", "Total deleted raw contacts: $totalDeleted")
@@ -282,6 +305,8 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       contactsDict: Map<String, Contact>,
       contentResolver: ContentResolver
     ) {
+      Log.e("SyncContactsManager", "insertContacts, ${contactsDict.size} contacts")
+
       val ops = ArrayList<ContentProviderOperation>()
       val totalContacts = contactsDict.size
       var counter = 1
@@ -590,7 +615,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
   private fun showToastOnMainThread(message: String) {
     Log.d("SyncContactsManager", "showToastOnMainThread $message")
     Handler(Looper.getMainLooper()).post {
-      Toast.makeText(context.applicationContext, message, Toast.LENGTH_SHORT).show()
+      Toast.makeText(context.applicationContext, message, Toast.LENGTH_LONG).show()
     }
   }
 }
