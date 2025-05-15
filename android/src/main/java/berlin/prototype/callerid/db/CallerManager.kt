@@ -114,16 +114,31 @@ object CallerManager {
 
   private fun unblockCallers(items: JSONArray) {
     Log.d("CallerManager", "unblockCallers count: ${items.length()}")
-    val currentBlockedCallers = blockedCallers.toSet()
 
+    if (items.length() == 0 || blockedCallers.isEmpty()) return
+
+    // Build fast lookup set
+    val blockedNumbers = blockedCallers.map { it.phoneNumber }.toHashSet()
+
+    // Build list of numbers to unblock
+    val numbersToUnblock = mutableSetOf<String>()
     for (i in 0 until items.length()) {
       val item = items.getJSONObject(i)
-      val phoneNumber = item.getLong("phonenumber")
-      blockedCallers.removeIf { it.phoneNumber == phoneNumber.toString() }
+      val phoneNumber = item.getLong("phonenumber").toString()
+      if (phoneNumber in blockedNumbers) {
+        numbersToUnblock.add(phoneNumber)
+      }
     }
 
-    if (currentBlockedCallers != blockedCallers) {
-      Log.d("CallerManager", "save unblockCallers (" + blockedCallers.size + ")")
+    if (numbersToUnblock.isEmpty()) return
+
+    // Remove in one pass
+    val newBlockedCallers = blockedCallers.filterNot { it.phoneNumber in numbersToUnblock }
+
+    if (newBlockedCallers.size != blockedCallers.size) {
+      Log.d("CallerManager", "save unblockCallers (${newBlockedCallers.size})")
+      blockedCallers.clear()
+      blockedCallers.addAll(newBlockedCallers)
       saveCallerList(blockedCallers, BLOCKED_CALLERS_FILE)
     }
   }
