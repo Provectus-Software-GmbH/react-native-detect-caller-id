@@ -58,7 +58,6 @@ class CallDirectoryHandler: CXCallDirectoryProvider {
 
               case "unblock":
                 unblock(callerList, to: context)
-                identify(callerList, to: context)
 
               case "identify":
                 identify(callerList, to: context)
