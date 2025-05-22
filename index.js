@@ -21,6 +21,34 @@ let CallerDetector = {
     reloadExtension: async () => { },
     simulateIncomingCall: async (phonenumber: string) => { },
     syncContacts: async(items: any[], isVacationModeActive: boolean) => {},
+    blockLocalContact: async(guid: string) => {},
+    unblockLocalContact: async(guid: string) => {},
+}
+
+
+// android only
+CallerDetector.blockLocalContact = async (guid) => {
+    try {
+        if (Platform.OS === 'android') {
+            return CallerId.syncContacts(guid);
+        } else {
+            throw new Error('This method is Android only');
+        }
+    } catch (error) {
+        throw error;
+    }
+}
+
+// android only
+CallerDetector.unblockLocalContact = async (guid) => {
+    try {
+        if (Platform.OS === 'android') {
+
+        } else {
+            throw new Error('This method is Android only');
+        }
+    } catch (error) {
+        throw error;
 }
 
 // ios:  returns "denied" or "granted"
