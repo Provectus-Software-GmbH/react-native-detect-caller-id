@@ -21,16 +21,16 @@ let CallerDetector = {
     reloadExtension: async () => { },
     simulateIncomingCall: async (phonenumber: string) => { },
     syncContacts: async(items: any[], isVacationModeActive: boolean) => {},
-    blockLocalContact: async(guid: string) => {},
-    unblockLocalContact: async(guid: string) => {},
+    blockLocalContact: async(signature: string) => {},
+    unblockLocalContact: async(signature: string) => {},
 }
 
 
 // android only
-CallerDetector.blockLocalContact = async (guid) => {
+CallerDetector.blockLocalContact = async (signature) => {
     try {
         if (Platform.OS === 'android') {
-            return CallerId.syncContacts(guid);
+            return CallerId.blockLocalContact(signature);
         } else {
             throw new Error('This method is Android only');
         }
@@ -40,15 +40,16 @@ CallerDetector.blockLocalContact = async (guid) => {
 }
 
 // android only
-CallerDetector.unblockLocalContact = async (guid) => {
+CallerDetector.unblockLocalContact = async (signature) => {
     try {
         if (Platform.OS === 'android') {
-
+            return CallerId.unblockLocalContact(signature);
         } else {
             throw new Error('This method is Android only');
         }
     } catch (error) {
         throw error;
+    }
 }
 
 // ios:  returns "denied" or "granted"

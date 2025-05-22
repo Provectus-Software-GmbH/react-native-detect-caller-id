@@ -91,8 +91,8 @@ fun transform(source: IProtoContact, isVacationModeActive: Boolean = false): Con
   val sendToVoicemail = if (isVacationModeActive) !(source.isFavorite ?: false) else false
 
   return Contact(
-    guid = source.ihash,
-    sourceId = "SCA-" + source.ihash,
+    guid = source.guid,
+    sourceId = "SCA-" + source.signature,
     contactType = "person",
     name = name,
     lastName = source.surname.orEmpty(),

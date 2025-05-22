@@ -110,7 +110,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
   @ReactMethod
-  fun blockLocalContact(guid: String, promise: Promise) {
+  fun blockLocalContact(signature: String, promise: Promise) {
     Log.d("DetectCallerIdModule", "blockLocalContact")
     if (!workProfileAvailable) {
       promise.reject("DetectCallerId", "Blocking local contacts while not in work profile mode is not supported by this plugin")
@@ -118,7 +118,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
     try {
       val manager = SyncContactsManager(context)
-      manager.blockLocalContact(guid)
+      manager.blockLocalContact(signature)
       promise.resolve("blocked local contact")
     } catch (e: JSONException) {
       e.printStackTrace()
@@ -126,7 +126,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
   }
 
   @ReactMethod
-  fun unblockLocalContact(guid: String, promise: Promise) {
+  fun unblockLocalContact(signature: String, promise: Promise) {
     Log.d("DetectCallerIdModule", "unblockLocalContact")
     if (!workProfileAvailable) {
       promise.reject("DetectCallerId", "Unblocking local contacts while not in work profile mode is not supported by this plugin")
@@ -134,7 +134,7 @@ class DetectCallerIdModule(reactContext: ReactApplicationContext) : ReactContext
     }
     try {
       val manager = SyncContactsManager(context)
-      manager.unblockLocalContact(guid)
+      manager.unblockLocalContact(signature)
       promise.resolve("unblocked local contact")
     } catch (e: JSONException) {
       e.printStackTrace()

@@ -150,28 +150,28 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
     }
 
     // function to get the raw id of a contact by its guid
-    private fun getRawIdByGuid(guid: String): Long? {
-        Log.d("getRawIdByGuid guid:", guid)
+    private fun getRawIdBySignature(signature: String): Long? {
+        Log.d("getRawIdBySignature signature:", signature)
         val curContactsRawIds = getMappedRawIds()
         // extract rawID from MAP curContactsRawIds() <String, Long> where key = "SCA-${guid}"
-        val rawId = curContactsRawIds["SCA-$guid"]
-        Log.d("getRawIdByGuid rawId:", rawId.toString())
+        val rawId = curContactsRawIds["SCA-$signature"]
+        Log.d("getRawIdBySignature rawId:", rawId.toString())
         return rawId
     }
 
     // block a single contact by guid
-    fun blockLocalContact(guid: String) {
-        getRawIdByGuid(guid)?.let { rawID ->
+    fun blockLocalContact(signature: String) {
+        getRawIdBySignature(signature)?.let { rawID ->
             updateSendToVoicemailFlag(listOf(rawID), true)
-            Log.d("block", "guid: $guid, block rawId: $rawID")
+            Log.d("block", "signature: $signature, block rawId: $rawID")
         }
     }
 
     // unblock a single contact by guid
-    fun unblockLocalContact(guid: String) {
-        getRawIdByGuid(guid)?.let { rawID ->
+    fun unblockLocalContact(signature: String) {
+        getRawIdBySignature(signature)?.let { rawID ->
             updateSendToVoicemailFlag(listOf(rawID), false)
-            Log.d("unblock", "guid: $guid, unblock rawId: $rawID")
+            Log.d("unblock", "signature: $signature, unblock rawId: $rawID")
         }
     }
 
@@ -227,7 +227,7 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
       }
     }
 
-    Log.d("SyncContactsManager", "Mapped ${mappedIds.size} sourceIds to raw IDs")
+//    Log.d("SyncContactsManager", "Mapped ${mappedIds.size} sourceIds to raw IDs")
     return mappedIds
   }
 
