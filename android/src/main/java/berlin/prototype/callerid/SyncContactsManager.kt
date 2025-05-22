@@ -61,8 +61,21 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
         const val NOTIFICATION_ID = 101
     }
 
+    // Flag to track the execution state of syncContacts
+    @Volatile
+    private var isSyncing = false
+
     fun syncContacts(options: ReadableMap, isVacationModeActive: Boolean) {
       Log.d("SyncContactsManager", "syncContacts")
+
+        // Check if a sync is already in progress
+        if (isSyncing) {
+            Log.d("SyncContactsManager", "Sync is already in progress. Aborting new request.")
+            return
+        }
+
+        // Set the flag to true to indicate the sync has started
+        isSyncing = true
 
         if (!permissionsHelper.hasContactPermissions()) {
             //promise.reject("NO_ACTIVITY", "Cannot request permissions: no active activity.")
@@ -124,11 +137,41 @@ class SyncContactsManager(reactContext: ReactApplicationContext) : ReactContextB
                 } catch (e: Exception) {
                     e.printStackTrace()
                     //promise.reject("SYNC_ERROR", "Failed to sync contacts", e)
+                } finally {
+                    // Reset the flag to allow future syncs
+                    isSyncing = false
                 }
             }.start()
         } catch (e: JSONException) {
             e.printStackTrace()
             // promise.reject("PARSE_ERROR", "Failed to parse JSON", e)
+            isSyncing = false // Reset the flag when the sync is complete
+        }
+    }
+
+    // function to get the raw id of a contact by its guid
+    private fun getRawIdByGuid(guid: String): Long? {
+        Log.d("getRawIdByGuid guid:", guid)
+        val curContactsRawIds = getMappedRawIds()
+        // extract rawID from MAP curContactsRawIds() <String, Long> where key = "SCA-${guid}"
+        val rawId = curContactsRawIds["SCA-$guid"]
+        Log.d("getRawIdByGuid rawId:", rawId.toString())
+        return rawId
+    }
+
+    // block a single contact by guid
+    fun blockLocalContact(guid: String) {
+        getRawIdByGuid(guid)?.let { rawID ->
+            updateSendToVoicemailFlag(listOf(rawID), true)
+            Log.d("block", "guid: $guid, block rawId: $rawID")
+        }
+    }
+
+    // unblock a single contact by guid
+    fun unblockLocalContact(guid: String) {
+        getRawIdByGuid(guid)?.let { rawID ->
+            updateSendToVoicemailFlag(listOf(rawID), false)
+            Log.d("unblock", "guid: $guid, unblock rawId: $rawID")
         }
     }
 
